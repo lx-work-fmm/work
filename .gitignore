@@ -1,1 +1,3 @@
-__pycache__
+__pycache__/
+# 不跟踪大文件
+/static
