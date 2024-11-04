@@ -1,0 +1,6 @@
+{
+    "files.associations": {
+        "lasersdklib.h": "c",
+        "lasersdklibtype.h": "c"
+    }
+}
