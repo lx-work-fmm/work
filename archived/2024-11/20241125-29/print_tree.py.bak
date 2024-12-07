@@ -1,0 +1,42 @@
+
+
+tree = {}
+root = 'E:/work/2024-11/20241111-15'
+
+import os
+def get_tree(root, rel='', tree={}):
+    """
+    :return: 类似于
+    {
+        "dist": {},
+        "res": {},
+        "tmp": {
+            "sd.py": null,
+            "sd1.py": null
+        }
+    }
+    """
+    # print(rel)
+    abs = os.path.join(root, rel)
+    for v in os.listdir(abs):
+        sub_abs = os.path.join(abs, v)
+        sub_rel = os.path.join(rel, v)
+        # print(sub_abs, sub_rel)
+        
+        # print((sub_rel.count(os.sep)*"\t") + v)
+        if os.path.isfile(sub_abs):
+            if v.endswith('.py') and not v.endswith('.pyc'):
+                tree[v] = None
+        else:
+            if not v.startswith('.'):
+                tree[v] = {}
+                get_tree(root, sub_rel, tree[v])
+                if tree[v] == {}:
+                    del tree[v]
+
+
+# get_tree(root, '', tree)
+get_tree(input('ptah: '), '', tree)
+import json
+print(json.dumps(tree, indent=2, ensure_ascii=False), )
+

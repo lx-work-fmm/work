@@ -1,0 +1,12 @@
+import wx, os
+os.chdir(os.path.dirname(__file__))
+class Frame(wx.Frame):
+    def __init__(self):
+        wx.Frame.__init__(self, None)
+        btn = wx.Button(self)
+        btn.Bind(wx.EVT_BUTTON, lambda e: print(123, e))
+        btn.Bind(wx.EVT_BUTTON, lambda e: print(1, e.Skip()))
+        self.Bind(wx.EVT_BUTTON, lambda e: print(2), btn)
+app = wx.App()
+Frame().Show()
+app.MainLoop()w

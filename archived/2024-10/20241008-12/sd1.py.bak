@@ -1,0 +1,15 @@
+import wx
+class MyFrame(wx.Frame):
+    def __init__(self, parent, title):
+        super(MyFrame, self).__init__(parent, title=title, size=(300, 200))
+        self.timer = wx.Timer(self)
+        self.Bind(wx.EVT_TIMER, self.timerEvent, self.timer)
+        self.timer.Start(1000)
+
+    def timerEvent(self, event):
+        print("定时器事件触发")
+
+app = wx.App()
+frame = MyFrame(None, 'wx.Timer Example')
+frame.Show(True)
+app.MainLoop()

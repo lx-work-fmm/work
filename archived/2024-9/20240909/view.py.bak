@@ -1,0 +1,71 @@
+import wx
+
+
+class MyFrame(wx.Frame):
+    def __init__(self, *args, **kw):
+        wx.Frame.__init__(self, None, size=(350,300), title='merger')
+        frame = self
+
+        panel = wx.Panel(frame)
+
+        dir_dialog = wx.DirDialog(frame, 'initial msg')
+        def get_path():
+            dir_dialog.SetMessage('选择目录')
+            return dir_dialog.GetPath() if dir_dialog.ShowModal() == wx.ID_OK else 'None'
+        file_dialog = wx.FileDialog(frame, 'initial msg')
+        def get_file():
+            file_dialog.SetMessage('选择文件')
+            return file_dialog.GetPath() if file_dialog.ShowModal() == wx.ID_OK else 'None'
+
+
+        btn1 = wx.Button(panel, label='Efficiency File Path: ', pos=(5,20))
+        txt1 = wx.StaticText(panel, label='', pos=(150,20))
+        btn1.Bind(wx.EVT_BUTTON, lambda e: (txt1.SetLabel(get_file()), txt1.SetToolTip(txt1.GetLabel())))
+
+        btn2 = wx.Button(panel, label='Gain File Path: ', pos=(5,70))
+        txt2 = wx.StaticText(panel, label='', pos=(150,70))
+        btn2.Bind(wx.EVT_BUTTON, lambda e: (txt2.SetLabel(get_file()), txt2.SetToolTip(txt2.GetLabel())))
+
+        btn3 = wx.Button(panel, label='Output Dir: ', pos=(5,120))
+        txt3 = wx.StaticText(panel, label='', pos=(150,120))
+        btn3.Bind(wx.EVT_BUTTON, lambda e: (txt3.SetLabel(get_path()), txt3.SetToolTip(txt3.GetLabel())))
+
+        btn = wx.Button(panel, label='Merge', pos=(130,170))
+        gauge = wx.Gauge(panel, pos=(20,220), size=(260, 15))
+
+        import control
+        txt1.SetLabel('E:\\work\\20240909\\data\\SystemEfficiencyCalibration_Pb32.csv')
+        txt2.SetLabel('E:\\work\\20240909\\data\\SystemGainCalibration_Pb32.csv')
+        txt3.SetLabel('C:\\Users\\Administrator\\Desktop')
+        txt1.SetToolTip(txt1.GetLabel())
+        txt2.SetToolTip(txt2.GetLabel())
+        txt3.SetToolTip(txt3.GetLabel())
+        def merge(e):
+            st = 0
+            self.timer = wx.Timer(panel)
+            def on_timeout(e):
+                if st == 1:
+                    self.timer.Stop()
+                    gauge.SetValue(100)
+                elif st == 2:
+                    self.timer.Stop()
+                    gauge.SetValue(0)
+                else:
+                    gauge.SetValue(gauge.GetValue()+1)
+
+            gauge.SetValue(0)
+            frame.Bind(wx.EVT_TIMER, on_timeout)
+            self.timer.Start(100)
+
+            try:
+                control.merge(txt1.GetLabel(), txt2.GetLabel(), txt3.GetLabel())
+                st = 1
+                gauge.SetValue(100)
+                wx.MessageBox('success')
+            except:
+                st = 2
+                gauge.SetValue(0)
+                wx.MessageBox('failed')
+        
+        btn.Bind(wx.EVT_BUTTON, merge)
+

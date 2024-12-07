@@ -1,0 +1,8 @@
+import wx
+import view
+
+if __name__ == '__main__':
+    app = wx.App()
+    frame = view.MyFrame(None)
+    frame.Show()
+    app.MainLoop()

@@ -1,0 +1,87 @@
+import wx
+import wx.gizmos
+import wx.grid
+import wx.html
+import os
+import pickle
+
+import wx.lib.scrolledpanel
+os.chdir(os.path.dirname(__file__))
+
+
+class MyDropTarget(wx.TextDropTarget):
+    def __init__(self, lc: wx.ListCtrl):
+        wx.TextDropTarget.__init__(self)
+        self.lc = lc
+    
+    def OnDropText(self, x, y, data):
+        self.lc.InsertItem(0, data)
+        return True
+
+def init(frame: wx.Frame):
+    # pnl = wx.Panel(frame)
+    # _ = wx.BoxSizer()
+    # _.Add(pnl, flag=wx.EXPAND)
+    # frame.SetSizer(_)
+
+    spl1 = wx.SplitterWindow(frame)
+    spl2 = wx.SplitterWindow(spl1)
+    
+    import pathlib
+    gdc = wx.GenericDirCtrl(spl1, dir=str(pathlib.Path.home()), style=wx.DIRCTRL_DIR_ONLY)
+
+    lc1 = wx.ListCtrl(spl2, style=wx.LC_LIST)
+    lc2 = wx.ListCtrl(spl2, style=wx.LC_LIST)
+
+    dt = MyDropTarget(lc2)
+    lc2.SetDropTarget(dt)
+
+    def on_drag_init(e):
+        txt = lc1.GetItemText(e.GetIndex())
+        ds = wx.DropSource(lc1)
+        tdo = wx.TextDataObject(txt)
+        ds.SetData(tdo)
+        ds.DoDragDrop(True)
+    frame.Bind(wx.EVT_LIST_BEGIN_DRAG, on_drag_init, id=lc1.GetId())
+
+    spl2.SplitHorizontally(lc1, lc2, 150)
+    spl1.SplitVertically(gdc, spl2, 200)
+
+    def on_select(e):
+        lc1.ClearAll()
+        lc2.ClearAll()
+        
+        for v in os.listdir(gdc.GetPath()):
+            if v != '.':
+                lc1.InsertItem(0, v)
+    frame.Bind(wx.EVT_TREE_SEL_CHANGED, on_select, id=gdc.GetTreeCtrl().GetId())
+
+    on_select(None)
+    
+
+if __name__ == '__main__':
+    app = wx.App()
+
+    frame = wx.Frame(None, style=wx.WS_EX_PROCESS_UI_UPDATES | wx.DEFAULT_FRAME_STYLE)
+
+    # html = wx.html.HtmlWindow(frame, size=(420, -1))
+    # s = ''
+    # with open('./sd.html') as f:
+    #     s = f.read()
+    # html.SetPage(s % ('jiba', 'lao'))
+    # btn = html.FindWindowById(wx.ID_OK)
+    # ir = html.GetInternalRepresentation()
+    # html.SetSize( (ir.GetWidth()+25, ir.GetHeight()+25) )
+    # frame.SetSize(html.GetSize())
+    # frame.CentreOnParent(wx.BOTH)
+
+    init(frame)
+
+    import wx.lib.inspection
+    ins = wx.lib.inspection.InspectionTool()
+    def on_f12(e):
+        if e.KeyCode == 351:
+            ins.Show()
+    frame.Bind(wx.EVT_KEY_DOWN, on_f12)
+    frame.Show()
+    app.MainLoop()

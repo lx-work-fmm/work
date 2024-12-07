@@ -1,0 +1,38 @@
+import sys
+sys.path.insert(0, r'E:\codespaces\projects')
+from lib.csv import write_csv, read_csv
+
+def calc_eff(file: str):
+    """
+    输入：S11数据
+    输出：效率曲线csv, 第一列是频率，第二列是效率（百分比）
+    备注：从S11_dB换算成效率的公式为：  eff = 1- 10^(S11_dB/20)
+    """
+    data = read_csv(file)
+
+    res = []
+    for v in data:
+        try:
+            freq = float(v[0])
+            S11_dB = float(v[1])
+            eff = 100 * (1 - 10 ** (S11_dB / 20))
+            res.append((freq, eff))
+        except:
+            pass
+    
+    import os
+    def get_out_path(path: str):
+        preffix, ext = os.path.splitext(path)
+        return f'{preffix}-out{ext}'
+
+    write_csv(get_out_path(file), res)
+
+if __name__ == '__main__':
+    import os
+    os.chdir(os.path.dirname(__file__))
+    calc_eff('./2/S11/600MHz_1_S11.csv')
+    calc_eff('./2/S11/600MHz_2_S11.csv')
+    calc_eff('./2/S11/600MHz_3_S11.csv')
+    calc_eff('./2/S11/800MHz_1_S11.csv')
+    calc_eff('./2/S11/800MHz_2_S11.csv')
+    calc_eff('./2/S11/800MHz_3_S11.csv')

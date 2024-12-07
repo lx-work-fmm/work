@@ -1,0 +1,147 @@
+# coding=utf-8
+
+# if __name__ == '__main__':
+
+    # import stageControl_basic as sc
+import stageControl_basic as sc
+
+from genericpath import isfile
+import time
+class stageControl_common(object):
+    def __init__(self):
+        self.h=sc.stageControl_basic()
+        pass
+
+    def setConnect(self,ip=('192.168.255.33',10001),_id=1):
+        '''
+            连接函数
+            id:是电机的索引号,索引从1开始，1是电机A,2是电机2
+            返回: 0是无错误。
+
+        '''
+        # self._id=_id
+        rc=self.h.setConnect(ip,_id)
+        return rc
+
+    def StartMove(self, targetPose, speed):
+        # if targetPose > 270:
+        #     targetPose = 270
+        # if targetPose < -270:
+        #     targetPose = -270
+        targetPose = -targetPose
+        self.setPosition(targetPose, speed)
+        self.setMotionStart()
+    
+    def StopMove(self):
+        self.stop()
+
+    def stop(self,_id=1):
+        '''
+            停止运动
+            返回结果如setConnect()
+        '''
+        rc1=self.h.stop(_id)
+        rc2=self.h.ClearAlarm(_id)
+        return rc1&rc2
+    def setPosition(self,pos,speed,_id=1):
+        '''
+            设置位置
+            POS:角度，整型
+            speed: 速度，整型
+            返回结果如setConnect()
+        '''
+        self.stop(_id)
+        if speed > 40:
+            speed = 40
+        self.h.setSpeed(speed,_id)
+
+        rc=self.h.setPosition(pos,_id)
+        
+        return rc
+    
+    def setMotionStart(self,_id=1):
+        '''
+        启动运动
+        '''
+        self.h.setMotionStart(_id)
+
+
+    def getPosition(self,_id=1):
+        '''
+            获得角度
+            返回整型
+        '''
+        # print(_id)
+        try:
+            pos=self.h.getPosition(_id)
+            if _id == 2:
+                return pos/360
+            return -pos
+        except:
+            return False
+    
+    def setZero(self,_id=1):
+        '''
+            设置零点
+        '''
+        re=self.h.setZero(_id)
+        return re
+    def setLast(self,_id=1):
+        '''
+            设置成上次的位置
+        '''
+        re=self.h.setLast(_id)
+        return re
+        
+    def ClearAlarm(self,_id=1):
+        '''
+            清除报警,无效，使用STOP替代
+        '''
+        rc=self.h.ClearAlarm(_id)
+        return rc
+    def getStatus(self,_id=1):
+
+        '''
+            获得报警/状态
+        '''
+        rc=self.h.getStatus(_id)
+        return 0
+    def initStage(self,_id=1):
+        '''
+            复位电机,编码器初始化
+        '''
+        re=self.h.stop(_id=1)
+        if re==0:
+            re=self.h.initStage(_id)
+        return re
+        pass
+    
+    def setExtTrig(self,mode):
+        '''
+        设置软件还是硬件触发，mode=1为硬件触发 mode=0为软件触发
+        '''
+        self.h.setExtTrig(mode)
+
+if __name__ == '__main__':
+    scc=stageControl_common()
+    # time.sleep(3)
+    print(scc.setConnect())
+    # # print(scc.stop())
+    # # print(scc.initStage())
+    # # print(scc.SetZero())
+    # # print(scc.stop())
+    scc.setExtTrig(0)
+    print(scc.setPosition(360,40))
+    scc.setMotionStart()
+    # time.sleep(1)
+    # # scc.stop()
+    # # time.sleep(10)
+
+    print(scc.getPosition())
+    # time.sleep(3)
+    # # print(scc.stop())
+    # # print(scc.getPosition())
+
+    pass
+
+

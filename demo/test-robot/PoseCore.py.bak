@@ -1,0 +1,496 @@
+# -*- coding: utf-8 -*-
+import numpy as np
+from scipy.spatial.transform import Rotation
+from numpy import cos, sin, arctan2, arcsin, pi, sqrt
+# from SystemConfig.Model.SettingJson import SettingJson as SystemConfigSetting
+import time
+
+class PoseCore(object):
+    #
+    #@ModuleName : 坐标转换工具类
+    #@Explanation  : 此类用于通过空间坐标解算机器人每个轴的姿态输入空间坐标、输出6个轴的角度
+    #
+
+    def __init__(self,model='GP25'):
+        self.robot = robot_model(model)
+
+    def mat_2_pose(self, mat):
+        """
+        输入旋转矩阵, 输出坐标
+        """
+
+        x = mat[0,3]
+        y = mat[1,3]
+        z = mat[2,3]
+        if (mat[2,0] > (1.0 - 1e-6)):
+            p = -pi/2
+            r = 0
+            w = arctan2(-mat[1,2],mat[1,1])
+        elif mat[2,0] < -1.0 + 1e-6:
+            p = pi/2
+            r = 0
+            w = arctan2(mat[1,2],mat[1,1])
+        else:
+            p = arctan2(-mat[2,0],sqrt(mat[0,0]*mat[0,0]+mat[1,0]*mat[1,0]))
+            w = arctan2(mat[1,0],mat[0,0])
+            r = arctan2(mat[2,1],mat[2,2])    
+        return [x, y, z, r*180/pi, p*180/pi, w*180/pi]
+
+    def pose_2_mat(self, pose):
+        """
+        输入坐标, 输出旋转矩阵
+        """
+
+        [x,y,z,r,p,w] = pose
+        a = r*pi/180
+        b = p*pi/180
+        c = w*pi/180
+        ca = cos(a)
+        sa = sin(a)
+        cb = cos(b)
+        sb = sin(b)
+        cc = cos(c)
+        sc = sin(c)    
+        mat = np.array([[cb*cc, cc*sa*sb - ca*sc, sa*sc + ca*cc*sb, x],
+                    [cb*sc, ca*cc + sa*sb*sc, ca*sb*sc - cc*sa, y],
+                    [-sb, cb*sa, ca*cb, z],
+                    [0,0,0,1]])
+        return mat
+
+
+    #改进DH参数Modified D-H
+    def trans_MDH(self, alpha, a, q, d):
+
+        alpha = alpha / 180.0 * pi
+        q = q / 180.0 * pi
+        t = np.array([[cos(q),           -sin(q),            0,              a],
+                [sin(q)*cos(alpha), cos(q)*cos(alpha), -sin(alpha), -sin(alpha)*d],
+                [sin(q)*sin(alpha), cos(q)*sin(alpha),  cos(alpha),  cos(alpha)*d],
+                [0,                  0,            0,               1]])
+        return t
+
+    #输入坐标,输入的XYZ,以及RX RY RZ是角度 
+    #输出6给轴的角度
+    def Pose2Joint(self, pose, mdh, curjointFlag = True, j1_cur = 0, j4_cur = 0):
+        """
+        输入坐标, 输入的XYZ, 以及RX RY RZ是角度, 标准motoman的构型XYZ
+        输出6个轴的角度
+        mdh 机器人构型矩阵
+        curjointFlag 默认为True, 使用和当前位置最为接近的解
+                当为False的时候, j1使用单独规则, j4使用和0相比最接近的解
+        j1_cur 当前第1轴的角度
+        j4_cur 当前第4轴的角度
+        """
+        j1_cur = j1_cur * np.pi / 180.0
+
+        if abs(pose[0]) < 0.001:
+            pose[0] = 0.01
+
+        px = pose[0]
+        py = pose[1]
+        pz = pose[2]
+        t60 = self.pose_2_mat(pose)
+
+        ax = t60[0,2]
+        ay = t60[1,2]
+        az = t60[2,2]
+        theta1 = 0
+        theta2 = 0
+        theta3 = 0
+
+        x1 = px - ax * mdh[5,3]
+        y1 = py - ay * mdh[5,3]
+        z1 = pz - az * mdh[5,3] - mdh[0,3]
+        
+        theta1 = arctan2(y1, x1)
+
+        if curjointFlag == True:
+            if theta1 > 0:
+                theta1_temp2 = theta1 - pi
+            else:
+                theta1_temp2 = theta1 + pi
+            if abs(theta1 - j1_cur) > abs(abs(theta1_temp2 - j1_cur)):
+                #这里判断另一个解离当前位置更近,使用另外一个解
+                theta1 = theta1_temp2
+        else:
+            # 解出theta1,虽然theta1理论上有2个解,但另外一解会让机器人姿态非常奇怪,故不采用
+            # 如果法兰朝前,但坐标在0点后方,为了保持轴1还是朝前,所以需要对计算结果反转
+            theta_temp6 = arctan2(ay, ax)
+            theta1_diff = theta1 - theta_temp6
+            if theta1_diff > pi:
+                theta1_diff = theta1_diff - 2*pi
+            elif theta1_diff < -pi:
+                theta1_diff = theta1_diff + 2*pi
+            
+            if theta1_diff <= pi/2.0 and theta1_diff >= -pi/2.0:
+                pass
+            else:
+                theta1 = theta1 + pi
+                if theta1 > pi:
+                    theta1 = theta1 - 2*pi
+
+
+        tempAng = np.arctan2(mdh[3,1], mdh[3,3])
+        tempA = mdh[2,1]
+        tempB = np.sqrt(mdh[3,1]**2 + mdh[3,3]**2)
+        #解出theta3,虽然theta3理论上有2个解,但为了限制theta3的范围,所以只用这个解
+        tempD = (z1**2 + (x1 / cos(theta1) - mdh[1,1])**2 - tempA**2 - tempB**2) / (2 * tempA * tempB)
+        if tempD > 1:
+            tempD = 1
+        elif tempD < -1:
+            tempD = -1
+        #注: abb机器人第三个轴和安川的方向相反 
+        if self.robot.robot_brand == 'motoman':
+            theta3 = arcsin(tempD) - tempAng
+            tempC = -tempB * cos(theta3 + tempAng)
+            tempD = mdh[2,1] + tempB*sin(theta3 + tempAng)
+        else:
+            theta3 = -(arcsin(tempD) - tempAng)
+            tempC = -tempB * cos(-theta3 + tempAng)
+            tempD = mdh[2,1] + tempB*sin(-theta3 + tempAng)
+        #解出theta2, theta2和theta3有关,因为theta3限制了范围,所以theta2也只有这一个解
+        tempD2 = z1/np.sqrt(tempC**2 + tempD**2)
+        if tempD2 > 1:
+            tempD2 = 1
+        elif tempD2 < -1:
+            tempD2 = -1
+
+        # 根据theta1的结果,先计算轴2的原点位置
+        axis2_x = mdh[1,1] * cos(theta1)
+        axis2_y = mdh[1,1] * sin(theta1)
+        x2 = x1 - axis2_x
+        y2 = y1 - axis2_y
+
+        if abs(arctan2(y2, x2) - theta1) > 3: #在theta1的负方向,应该相差pi
+            theta2 = -(pi - arcsin(tempD2) - arctan2(tempD, -tempC))
+        else:
+            theta2 = -(arcsin(tempD2) - arctan2(tempD, -tempC))
+
+        mdh[0,2] = theta1 * 180 / pi
+        mdh[1,2] = theta2 * 180 / pi - 90
+        if self.robot.robot_brand == 'motoman':
+            mdh[2,2] = -theta3 * 180 / pi
+            # 因为安川机器人第三个轴和abb的相反,所以上面theta3加个负号好求解
+        else:
+            mdh[2,2] = theta3 * 180 / pi
+
+        t10 = self.trans_MDH(mdh[0,0],mdh[0,1],mdh[0,2],mdh[0,3])
+        t21 = self.trans_MDH(mdh[1,0],mdh[1,1],mdh[1,2],mdh[1,3])
+        t32 = self.trans_MDH(mdh[2,0],mdh[2,1],mdh[2,2],mdh[2,3])
+        t20 = np.dot(t10, t21)
+        t30 = np.dot(t20, t32)
+
+        # e30new_e30 这个是把关节3—0原本Y轴指向法兰改为X轴指向
+        e30new_e30 = np.array([[0,0,1],[1,0,0],[0,1,0]])
+        e30 = np.dot(t30[0:3,0:3], e30new_e30)
+        e63 = np.dot(np.linalg.inv(e30), t60[0:3,0:3])
+
+        #通过这样计算,机器人第4 5 6轴其实就是基于关节3,然后分别转X Y' Z''得到最终法兰的姿态
+        euler = Rotation.from_dcm(e63).as_euler('XYZ', degrees = True)
+        euler[1] = euler[1] - 90
+        if self.robot.robot_brand == 'motoman':
+            #因为第6个轴和ABB机器人有180度偏差,所以这里要减个180
+            euler[2] = euler[2] - 180
+        if euler[2] < -180:
+            #防止原本就是负的再减180超限,这里转回360度,保证-180~180之间
+            euler[2] += 360
+        if self.robot.robot_brand == 'motoman':
+            #因为安川机器人第三个轴前面故意改反一次,所以这里三个轴都要再改负
+            euler[0] = -euler[0]
+            euler[1] = -euler[1]
+            euler[2] = -euler[2]
+        resultJoints = [[],[]]
+        resultJoints[0] = [theta1 * 180 / np.pi, theta2 * 180 / np.pi, theta3 * 180 / np.pi, euler[0], euler[1], euler[2]]
+        
+        if euler[0] > 0:
+            j4 = euler[0] - 180
+        else:
+            j4 = euler[0] + 180
+        if euler[2] > 0:
+            j6 = euler[2] - 180
+        else:
+            j6 = euler[2] + 180
+        resultJoints[1] = [theta1 * 180 / np.pi, theta2 * 180 / np.pi, theta3 * 180 / np.pi, j4, -euler[1], j6]
+
+        resultJoints[0] = [round(ii,3) for ii in resultJoints[0]]
+        resultJoints[1] = [round(ii,3) for ii in resultJoints[1]]
+        if curjointFlag == False:
+            if abs(resultJoints[0][3]) < abs(abs(resultJoints[1][3])):
+                return resultJoints[0]
+            else:
+                return resultJoints[1]
+        else:
+            if abs(resultJoints[0][3] - j4_cur) < abs(abs(resultJoints[1][3] - j4_cur)):
+                return resultJoints[0]
+            else:
+                return resultJoints[1]
+
+    #关节角转换为坐标,输入的joint是角度   大概需要0.4~0.5ms一个点
+    def Joint2Pose(self, mdh):
+        """
+        轴角度计算坐标
+        """
+        joint_num=6
+        T_List = []
+        for i in range(joint_num):        
+            T_List.append(self.trans_MDH(mdh[i, 0],mdh[i, 1],mdh[i, 2],mdh[i, 3]))
+        for i in range(joint_num-1):   
+            T_List[i + 1] = np.dot(T_List[i], T_List[i + 1])
+        pose = self.mat_2_pose(T_List[5])
+        pose = [round(ii, 3) for ii in pose]
+
+        return pose
+
+    def Robot_Joint2Pose(self, joints):
+        """
+        机器人 轴角度转坐标
+        """
+        mdh = np.array(self.robot.mdh)
+        for ii in range(6):
+            mdh[ii,2] = mdh[ii,2] + joints[ii]
+            if self.robot.robot_brand == 'motoman':
+                if ii >= 2:
+                    mdh[ii,2] = -mdh[ii,2]
+        
+        pose = self.Joint2Pose(mdh)
+        return pose
+
+    def Robot_Pose2Joint(self, pose, curjointFlag = True, j1_cur = 0, j4_cur = 0, j6_cur = 0):
+        """
+        机器人 坐标转轴角度
+        j4Flag 默认为False, 此时两种解判断谁第4个轴更接近0, 就用谁
+                当为True的时候, 判断谁的第4轴更接近当前位置, 就用谁
+        j4_cur 当前第4轴的角度
+        j6_cur 因为解算的轴角度都是小于180, 但第6轴其实可以-455~455, 所以为了减少翻转的次数, 对第6轴额外处理
+        """
+        mdh = np.array(self.robot.mdh)
+        joints = self.Pose2Joint(pose, mdh, curjointFlag, j1_cur, j4_cur)
+        if curjointFlag == True:
+            # 当前第6轴角度和下一个点的第6轴角度相差过大则对下一个点的第6轴进行+-360度处理
+            # 如果第6轴再+-360会超过400度,则不处理了
+            if j6_cur - joints[5] > 260 and joints[5] < 40:
+                joints[5] = joints[5] + 360
+            elif  j6_cur - joints[5] < -260 and joints[5] > -40:
+                joints[5] = joints[5] - 360
+        # 增加轴角上限判断, 如果超出上限则报错
+        if joints[0] > 180 or joints[0] < -180 or joints[1] > 155 or joints[1] < -105 or \
+            joints[2] > 240 or joints[2] < -170 or joints[3] > 200 or joints[3] < -200 or \
+            joints[4] > 150 or joints[4] < -150 or joints[5] > 400 or joints[5] < -400:
+            print('Robot_Pose2Joint error, joint overrun:',joints) 
+            return False
+
+        # 增加正解判断,是否是同样的位置,如果不一样则代表逆解有问题。
+        newPose = self.Robot_Joint2Pose(joints)
+        if abs(newPose[0]-pose[0]) > 0.1 or abs(newPose[1]-pose[1]) > 0.1 or abs(newPose[2]-pose[2]) > 0.1:
+            print('Robot_Pose2Joint error. newPose:',newPose, '  pose:', pose, 'joint:',joints)
+            return False
+        return joints
+
+    def Robot_Joint2Pulse(self, joints):
+        """
+        机器人 角度转脉冲
+        """
+
+        pulseTran = np.array(self.robot.pulseTran)
+        joints = np.array(joints)
+        pulse = list(joints * pulseTran)
+        pulse = [int(ii) for ii in pulse]
+        return pulse
+
+    def Robot_Pulse2Joint(self, pulse):
+        """
+        机器人 脉冲转角度
+        """
+
+        pulseTran = np.array(self.robot.pulseTran)
+        pulse = np.array(pulse)
+        joints = list(pulse / pulseTran)
+        return joints
+
+    def Robot_Pose2Pulse(self, pose, curjointFlag = True, j1_cur = 0, j4_cur = 0, j6_cur = 0):
+        """
+        机器人 坐标转脉冲, 这里的 j1_cur , j4_cur , j6_cur 均为脉冲
+        """
+        joints = self.Robot_Pulse2Joint([j1_cur, 0, 0, j4_cur, 0, j6_cur])
+        j1_cur = joints[0]
+        j4_cur = joints[3]
+        j6_cur = joints[5] 
+        joints = self.Robot_Pose2Joint(pose, curjointFlag, j1_cur, j4_cur, j6_cur)
+        if joints == False:
+            return False
+        pulse = self.Robot_Joint2Pulse(joints)
+        return pulse
+
+    def Robot_Pulse2Pose(self, pulse):
+        """
+        机器人 脉冲转坐标
+        """
+
+        joints = self.Robot_Pulse2Joint(pulse)
+        pose = self.Robot_Joint2Pose(joints)
+        return pose
+
+    def pose_transform(self, pose1, pose2):
+        """
+        已知pose1在base的坐标, pose2在pose1坐标系下的坐标, 求解pose2在base的坐标
+        """
+
+        a = self.pose_2_mat(pose1)
+        b = self.pose_2_mat(pose2)
+        c = np.dot(a, b)
+        return self.mat_2_pose(c)
+
+    def pose_inversion(self, pose):
+        """
+        已知pose在base的坐标, 求解base在pose的坐标
+        """
+
+        a = self.pose_2_mat(pose)
+        b = np.linalg.inv(a)
+        return self.mat_2_pose(b)
+
+    def isSameJoint(self, joint1, joint2, diff = 1):
+        """
+        输入两个轴角度列表,判断两点是否同样位置
+        """
+        
+        if abs(joint1[0] - joint2[0]) < diff and \
+            abs(joint1[1] - joint2[1]) < diff and \
+            abs(joint1[2] - joint2[2]) < diff and \
+            abs(joint1[3] - joint2[3]) < diff and \
+            abs(joint1[4] - joint2[4]) < diff and \
+            abs(joint1[5] - joint2[5]) < diff :
+            return True
+        else:
+            return False
+
+    def isSamePulse(self, pulse1, pulse2, diff = 5):
+        """
+        输入两个脉冲列表,判断两点是否同位置
+        """
+        if abs(pulse1[0] - pulse2[0]) < diff and \
+            abs(pulse1[1] - pulse2[1]) < diff and \
+            abs(pulse1[2] - pulse2[2]) < diff and \
+            abs(pulse1[3] - pulse2[3]) < diff and \
+            abs(pulse1[4] - pulse2[4]) < diff and \
+            abs(pulse1[5] - pulse2[5]) < diff :
+            return True
+        else:
+            return False
+
+    def isSameCart(self, cart1, cart2, diff = 1):
+        """
+        输入两个笛卡尔坐标,判断两点是否同位置
+        """
+        
+        if abs(cart1[0] - cart2[0]) < diff and \
+            abs(cart1[1] - cart2[1]) < diff and \
+            abs(cart1[2] - cart2[2]) < diff and \
+            abs(cart1[3] - cart2[3]) < diff and \
+            abs(cart1[4] - cart2[4]) < diff and \
+            abs(cart1[5] - cart2[5]) < diff :
+            return True
+        else:
+            return False
+
+    # def WaitRobotMoveEnd(self,robot_obj,target_pulse,robot_speed,GetMoveEnable,robotId = 1):
+    #     timeout = int(SystemConfigSetting.GetSettings()['System Config']['TimeOut'])
+    #     t1 = time.time()
+    #     curPulse = robot_obj.GetPulsePosition()
+    #     curPulse_org = curPulse[:]
+    #     while(not(self.isSamePulse(target_pulse, curPulse))):
+    #         # print('Robot target_pulse',target_pulse,'curPulse',curPulse)
+    #         time.sleep(0.2)
+    #         t2 = time.time()
+    #         if t2 - t1 > timeout: # 如果机器人超过120秒还没有到达target_pulse,则进入条件
+    #             print("超时 在ExecutionFrame",__file__)
+    #             #超时
+    #             return False
+    #         if t2 - t1 > 2:
+    #             if self.isSamePulse(curPulse_org, curPulse):
+    #                 robot_obj.MoveJ(target_pulse, robot_speed, 0, 3)
+    #         if GetMoveEnable() == False:
+    #             #手动停止
+    #             print("手动停止")
+    #             return False
+    #         curPulse = robot_obj.GetPulsePosition()
+    #     return True
+
+class robot_model():
+    def __init__(self, name):
+        #默认GP25
+        self.name = name
+        if self.name == 'GP25' or 'GP25' in self.name:
+            self.gp25()
+            self.robot_brand = 'motoman'
+        elif self.name == 'MH24':
+            self.mh24()
+            self.robot_brand = 'motoman'
+        elif self.name == 'GP50':
+            self.gp50()
+            self.robot_brand = 'motoman'
+        elif self.name == 'Rokae':
+            self.xb7s()
+            self.robot_brand = 'rokae'
+        elif self.name == "MH50":
+            self.mh50()
+            self.robot_brand = 'motoman'
+        self.mdh = np.array(self.mdh)
+
+
+    def gp25(self):
+        self.mdh = [
+                [   0.0,   0.0,    0.0,   0.0], 
+                [ -90.0, 150.0,  -90.0,   0.0],
+                [   0.0, 760.0,    0.0,   0.0],
+                [ -90.0, 200.0,    0.0, 795.0],
+                [  90.0,   0.0,    0.0,   0.0],
+                [ -90.0,   0.0,    0.0, 100.0]]
+        self.pulseTran = [1341.3809838958746, 1907.6761559685297, 1592.8891322835186, 1022.8628460574974, 986.0748706813262, 536.6047546332629]
+
+    def mh24(self):
+        self.mdh = [
+                [   0.0,   0.0,    0.0,   0.0], 
+                [ -90.0, 150.0,  -90.0,   0.0],
+                [   0.0, 760.0,    0.0,   0.0],
+                [ -90.0, 200.0,    0.0, 795.0],
+                [  90.0,   0.0,    0.0,   0.0],
+                [ -90.0,   0.0,    0.0, 100.0]]
+        self.pulseTran = [1341.3809838958746, 1907.6761559685297, 1592.8891322835186, 1022.8628460574974, 986.0748706813262, 631.30]
+
+    def gp50(self):
+        self.mdh = [
+                [   0.0,   0.0,    0.0,    0.0], 
+                [ -90.0, 150.0,  -90.0,    0.0],
+                [   0.0, 870.0,    0.0,    0.0],
+                [ -90.0, 210.0,    0.0, 1025.0],
+                [  90.0,   0.0,    0.0,    0.0],
+                [ -90.0,   0.0,    0.0,  175.0]]
+        self.pulseTran = [1413.521630576936,  1604.270643954746,   1994.3621057878656,  779.6408877883681,    765.2059760225958 ,  467.43188419822263]
+    
+    # 络石
+    def xb7s(self):
+        self.mdh = [
+                [   0.0,   0.0,    0.0,    380.0], 
+                [ -90.0, 30.0,  -90.0,    0.0],
+                [   0.0, 340.0,    0.0,    0.0],
+                [ -90.0, 35.0,    0.0, 334.5],
+                [  90.0,   0.0,    0.0,    0.0],
+                [ -90.0,   0.0,    180.0,  82.5]]
+        self.pulseTran = [1, 1, 1, 1, 1, 1]
+
+
+    def mh50(self):
+        self.mdh = [
+                [   0.0,   0.0,    0.0,    0.0], 
+                [ -90.0, 145.0,  -90.0,    0.0],
+                [   0.0, 870.0,    0.0,    0.0],
+                [ -90.0, 210.0,    0.0, 1025.0],
+                [  90.0,   0.0,    0.0,    0.0],
+                [ -90.0,   0.0,    0.0,  175.0]]
+        self.pulseTran = [1413.525410164066,  1604.290822407628,   1994.364414258154,  779.6419731642711,    765.2059161782253 ,  467.4317923923233]
+
+if __name__ == '__main__':
+    pc = PoseCore()
+    print(pc.Robot_Pose2Pulse([1045.000, 1, 960.0, 0, -90, -180]))
+    

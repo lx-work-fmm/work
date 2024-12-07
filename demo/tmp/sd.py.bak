@@ -1,0 +1,25 @@
+import os
+
+res = ''
+p = r'E:\codespaces\projects\reCode_fm57-mi-fm01'
+def run(path: str, dep: int = 0):
+    ok = False
+    global res
+    ls = os.listdir(path)
+    ls.reverse()
+    for x in ls:
+        path1 = os.path.join(path, x)
+        if path1.endswith('.py') and x != '__init__.py':
+            ok = True
+            res += (dep * "\t") + f'- {x}\n'
+        elif os.path.isdir(path1) and x not in ['.git', '__pycache__'] and run(path1, dep+1):
+            ok = True
+            res += (dep * "\t") + f'- {x}\n'
+    return ok
+run(p)
+res_ = res.split('\n')
+res_.reverse()
+res = '\n'.join(res_)
+
+with open('__.txt', 'w') as f:
+    f.write(res)

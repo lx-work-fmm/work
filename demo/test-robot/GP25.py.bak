@@ -1,0 +1,127 @@
+from GP25Base import GP25Base
+from PoseCore import PoseCore
+
+# Structure 转 dict
+def struct2dict(struct):
+    result = {}
+    # print(struct._fields_)
+    for field, _ in struct._fields_:
+        value = getattr(struct, field)
+        # 如果字段类型不是基本类型且值为False，则认为是空指针
+        if (type(value) not in [int, float, bool]) and not bool(value):
+            value = None
+        # 如果字段是数组类型
+        elif hasattr(value, "_length_") and hasattr(value, "_type_"):
+            value = list(value)
+        # 如果字段是结构体类型
+        elif hasattr(value, "_fields_"):
+            value = struct2dict(value)
+        result[field] = value
+    return result
+
+class GP25(GP25Base):
+    def __init__(self, dll_path = './MOTOCOMES.dll'):
+        super().__init__(dll_path)
+        self.pc = PoseCore('GP25')
+        # if self.ESOpen(controllerType=4) != 0:
+        #     print(f'GP25 robot open failed')
+    
+    # (0) hold, servo
+    def ServoOn(self):
+        return self.ESServo(1)
+    def ServoOff(self):
+        return self.ESServo(2)
+    
+    # (1) 机器人位置相关
+    def GetPulsePos(self):
+        flag, poseData = self.ESGetPosition(1)
+        if flag == 0 and poseData.dataType == 0:
+            return poseData.axesData.axis[:6]
+        return [-1,-1,-1,-1,-1,-1]
+    
+    def GetCoorPos(self):
+        flag, poseData = self.ESGetPosition(101)
+        if flag == 0 and poseData.dataType == 16:
+            return poseData.axesData.axis[:6]
+        return [-1,-1,-1,-1,-1,-1]
+    
+    def GetJointPos(self):
+        """
+        注：需要 PoseCore 工具类
+        """
+        return self.pc.Robot_Pulse2Joint(self.GetPulsePos())
+    
+    def PulseMove(self, *args, **kw):
+        return self.ESPulseMove(*args, **kw)
+    
+    def CoorMove(self, target = [0, 0, 0, 0, 0, 0], **args):
+        target = self.pc.Robot_Pose2Pulse(target)
+        # 注： Robot_Pose2Pulse() 可能失败
+        # assert target != False
+        if target == False:
+            target = [0,0,0,0,0,0]
+        print(target)
+        return self.ESPulseMove(target=target, **args)
+    
+    def JointMove(self, target = [0, 0, 0, 0, 0, 0], **args):
+        target = self.pc.Robot_Joint2Pulse(target)
+        print(target)
+        return self.ESPulseMove(**args)
+    
+    def Move(self, target = [0, 0, 0, 0, 0, 0], type=1, **args):
+        """
+        MoveJ()
+        
+        :type: 1 -> 脉冲 pulse, 2 -> 坐标 coor, 3 -> 关节 joint
+        """
+        if type == 1:
+            return self.PulseMove(target=target, **args)
+        if type == 2:
+            return self.CoorMove(target=target, **args)
+        if type == 3:
+            return self.JointMove(target=target, **args)
+    
+    # (2) alarm
+    def GetAlarm(self):
+        res = self.ESGetAlarm()
+        if res[0] != 0:
+            raise Exception('GetAlarm error...')
+        return [struct2dict(v) for v in res[1].data]
+    
+    # (-)
+    # 这个函数有 bug
+    def WaitSamePos(self):
+        pass
+
+
+if __name__ == '__main__':
+    import os
+    os.chdir(os.path.dirname(__file__))
+    rb = GP25()
+    # rb.CoorMove(target=[1045, 0, 960, 0, -90, -180])
+    
+    # rb.JointMove(target=[1045, 1, 960, 0, -90, -180])
+    
+    if rb.ESOpen(4) == 0:
+        # print(rb.GetAlarm())
+        # print('pulse', rb.GetPulsePos())
+        # print('coor', rb.GetCoorPos())
+        # print('joint', rb.GetJointPos())
+        
+        
+        # move
+        rb.ServoOn()
+        print('begin...')
+        
+        joint = [-20,0,0,0,0,0]
+        pulse = rb.pc.Robot_Joint2Pulse(joint)
+        print(rb.ESPulseMove(pulse))
+        import time
+        time.sleep(3)
+        
+        rb.ServoOff()
+        print('end...')
+    else:
+        print('fail to open')
+        
+    

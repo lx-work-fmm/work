@@ -1,0 +1,53 @@
+import socket
+
+class Demo:
+	# 服务器示例
+    def server(self):
+        # (1) 创建服务端对象
+        # AF_INET -> IPv4
+        # SOCK_DGRAM -> UDP
+        skt_server = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        # (2) 绑定 host:port
+        skt_server.bind(('localhost', 9999))
+
+        while True:
+            # (3.1) 获取客户端发送的数据
+            req, addr = skt_server.recvfrom(4096)
+            req = req.decode()
+            print(f'receive data from {addr}: "{req}"')
+            
+            # (3.2) 返回数据
+            res = ''
+            if req == '0':
+                res = 'geji'
+            elif req == '1':
+                res = '114514'
+            elif req == '2':
+                res = 'ji ni tai mei'
+            else:
+                res = 'ikun'
+            skt_server.sendto(res.encode(), addr)
+            
+
+	# 客户端示例
+    def client(self):
+        # (1) 创建客户端对象
+        skt_client = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+
+        # (3.1) 发送数据 
+        skt_client.sendto(b'you you', ('localhost', 9999))
+        # (3.2) 获取数据
+        res, addr = skt_client.recvfrom(4096)
+        print(f'receive data: "{res.decode()}"')
+        
+	# 客户端的应用
+    def request(self, req: str, bufSize = 4096):
+        skt_client = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+
+        skt_client.sendto(req.encode(), ('localhost', 9999))
+        res, addr = skt_client.recvfrom(bufSize)
+        return res.decode()
+
+
+if __name__ == '__main__':
+    Demo().server()

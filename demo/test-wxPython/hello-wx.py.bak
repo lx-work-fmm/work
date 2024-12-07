@@ -1,0 +1,11 @@
+import wx
+
+if __name__ == '__main__':
+    app = wx.App()
+
+    frame = wx.Frame(None, title='test frame', size = (10,10))
+    panel = wx.Panel(frame)
+    # label = wx.StaticText(panel, label = 'hello world', pos = (150, 150))
+    frame.Show()
+    
+    app.MainLoop()

@@ -1,0 +1,4 @@
+import numpy as np
+
+print(int(np.linspace(start=0, stop=100, num=7)[5]))
+

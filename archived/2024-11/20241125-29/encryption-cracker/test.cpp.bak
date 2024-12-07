@@ -1,0 +1,22 @@
+#include<iostream>
+using namespace std;
+
+int fp(int a, int n){
+    int ans = 1;
+    while(n){
+        if(n & 1){
+            ans *= a;
+        }
+        a *= a;
+        n >>=1;
+    }
+    return ans;
+}
+
+signed main(){
+    int a, n;
+    while(1){
+        cin >> a >> n;
+        cout << fp(a, n) << '\n';
+    }
+}

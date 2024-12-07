@@ -1,0 +1,33 @@
+from ctypes import *
+from ctypes.wintypes import HANDLE
+import os
+os.chdir(os.path.dirname(__file__))
+
+
+class GP25():
+    def __init__(self):
+        self.dll = WinDLL('./MOTOCOMES.dll')
+        self.h = HANDLE()
+    
+    def ESOpen(self, ctltype=3, ip='192.168.255.1', h=None):
+        # self.dll.ESOpen.argtypes = (c_long, c_char_p,)
+        # self.dll.ESOpen.restype = 
+        return self.dll.ESOpen(c_int(ctltype), c_char_p(ip), byref(self.h))
+    
+    def ESClose(self, h):
+        return self.dll.ESClose(h.value)
+    
+    def ResetAlarm(self, h):
+        return self.dll.ResetAlarm(h.value)
+    
+    
+
+class Main():
+    def __init__(self):
+        rb = GP25()
+        ret = rb.ESOpen()
+        print(ret)
+
+if __name__ == '__main__':
+    main = Main()
+    

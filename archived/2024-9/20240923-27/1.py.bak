@@ -1,0 +1,53 @@
+import sys
+sys.path.insert(0, r'E:\codespaces\projects')
+from lib.csv import write_csv, read_csv
+
+import math
+def calc_gain(file1: str, file2: str, file3: str):
+    """
+    输入：三个csv文件路径
+    输出：增益曲线csv,第一列是频率，第二列是增益值
+    """
+    data1 = read_csv(file1)
+    data2 = read_csv(file2)
+    data3 = read_csv(file3)
+
+    res1 = []
+    res2 = []
+    res3 = []
+    for l1, l2, l3 in zip(data1, data2, data3):
+        try:
+            assert l1[0] == l2[0] == l3[0]  # 保证频率一致
+            freq = float(l1[0])
+            C = 3.0 * (10 ** 8) # 光速
+            A = 20 * math.log10(4 * math.pi * 5.3 / (C / freq))
+            # b1 = 10 * math.log10(10 ** (float(l1[3]) / 20))
+            # b2 = 10 * math.log10(10 ** (float(l2[3]) / 20))
+            # b3 = 10 * math.log10(10 ** (float(l3[3]) / 20))
+            b1 = float(l1[3]) / 2
+            b2 = float(l2[3]) / 2
+            b3 = float(l3[3]) / 2
+
+            g1 = (A + b1 + b2 - b3) / 2
+            g2 = (A + b1 - b2 + b3) / 2
+            g3 = (A - b1 + b2 + b3) / 2
+
+            res1.append((freq, g1))
+            res2.append((freq, g2))
+            res3.append((freq, g3))
+        except :
+            pass
+    
+    import os
+    def get_out_path(path: str):
+        preffix, ext = os.path.splitext(path)
+        return f'{preffix}-out{ext}'
+    
+    write_csv(get_out_path(file1), res1)
+    write_csv(get_out_path(file2), res2)
+    write_csv(get_out_path(file3), res3)
+
+if __name__ == '__main__':
+    import os
+    os.chdir(os.path.dirname(__file__))
+    calc_gain('./1/losVV_A2B_400MHz.csv', './1/losVV_A2C_400MHz.csv', './1/losVV_B2C_400MHz.csv')

@@ -1,0 +1,20 @@
+import wx, os
+os.chdir(os.path.dirname(__file__))
+print(os.getcwd())
+class Frame(wx.Frame):
+    def __init__(self):
+        wx.Frame.__init__(self, None)
+        self.tc = wx.TextCtrl(self, style=wx.TE_MULTILINE|wx.TE_RICH2|wx.TE_DONTWRAP)
+        with open('./sd.txt', 'r', encoding='utf-8') as f:
+            self.tc.SetValue(f.read())
+        self.Bind(wx.EVT_TEXT, self.on_text_change, self.tc)
+        self.Center()
+        
+    def on_text_change(self, e):
+        with open('./sd.txt', 'w', encoding='utf-8') as f:
+            f.write(self.tc.Value)
+
+app = wx.App()
+Frame().Show()
+app.MainLoop()
+

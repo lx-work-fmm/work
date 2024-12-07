@@ -1,0 +1,34 @@
+import csv
+import math, cmath
+
+# 读取 .csv 文件
+def read_csv(path):
+    return [v for v in csv.reader(open(path))]
+
+"""
+合并效率表和增益表
+注：两个表均为 2 x N 的矩阵
+"""
+def merge(efficency_path, gain_path, out_path='.'):
+    gain = read_csv(gain_path)
+    efficency = read_csv(efficency_path)
+    
+    res = []
+    for i in range(len(gain)):
+        row = [efficency[i][0], 0, efficency[i][1], gain[i][1]]
+        if i != 0:
+            t = row[2][:-1]
+            # row[2] = 20 * math.log10(float(t) / 100)
+            row[2] = 10 ** (float(t)/100/20)
+        else:
+            row[1] = '??'
+            row[2] = 'Efficiency(dB)'
+
+        res.append(row)
+    
+    res_writer = csv.writer(open(f'{out_path}/out.csv', 'w', newline=''))
+    res_writer.writerows(res)
+
+if __name__ == '__main__':
+    merge('./data/SystemEfficiencyCalibration_Pb32.csv', './data/SystemGainCalibration_Pb32.csv')
+

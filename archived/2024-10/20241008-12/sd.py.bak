@@ -1,0 +1,172 @@
+import wx
+import wx.adv
+import wx.aui
+import wx.grid
+import wx.html
+import wx.lib
+import wx.lib.agw
+import wx.lib.agw.cubecolourdialog
+import wx.lib.agw.customtreectrl
+import wx.lib.agw.ultimatelistctrl
+import wx.media
+import wx.ribbon
+import matplotlib
+import matplotlib.pyplot as plt
+from matplotlib.figure import Figure
+from matplotlib.backends.backend_wxagg import FigureCanvasWxAgg
+from matplotlib.backends.backend_wx import NavigationToolbar2Wx
+# matplotlib.use('WXAGG')
+
+def init(frame: wx.Frame):
+    bs = wx.BoxSizer(wx.VERTICAL)
+    frame.SetSizer(bs)
+    
+    bs.Add(wx.RadioButton(frame, label='=='), flag=wx.ALL|wx.ALIGN_CENTER, border=4)
+    bs.Add(wx.RadioButton(frame, label='114'), flag=wx.ALL|wx.ALIGN_CENTER, border=4)
+    bs.Add(wx.CheckBox(frame, label='514'), flag=wx.ALL|wx.ALIGN_CENTER, border=4)
+
+    rbx = wx.RadioBox(frame, label='==把',choices=['==', '吧', '114514'])
+    bs.Add(rbx, flag=wx.ALL, border=10)
+    
+    cb = wx.ComboBox(frame, choices=['1', '2', '3'],  value='123')
+    bs.Add(cb, proportion=1, flag=wx.ALIGN_CENTER)
+    
+    import time
+    import threading
+    gg  = wx.Gauge(frame, )
+    def f():
+        for i in range(1,101):
+            gg.SetValue(i)
+            time.sleep(1)
+    bs.Add(gg, flag=wx.ALL|wx.ALIGN_CENTER, border=10, proportion=3)
+    threading.Thread(target=f).start()
+    
+    bs.Add(wx.Slider(frame), flag=wx.ALIGN_CENTER)
+    
+    bs.Fit(frame)
+    
+    
+    mb = wx.MenuBar()
+    frame.SetMenuBar(mb)
+    
+    mn_file = wx.Menu()
+    mb.Append(mn_file, '&File')
+    
+    mi_text = wx.MenuItem(mn_file, 4, text='text', kind=wx.ITEM_NORMAL)
+    mn_file.AppendItem(mi_text)
+    mn_file.AppendSeparator()
+    mi_radio1 = wx.MenuItem(mn_file, 2, text='radio1', kind=wx.ITEM_RADIO)
+    mn_file.Append(mi_radio1)
+    mi_radio2 = wx.MenuItem(mn_file, 3, text='radio2', kind=wx.ITEM_RADIO)
+    mn_file.Append(mi_radio2)
+    mn_file.AppendSeparator()
+    mi_check = wx.MenuItem(mn_file, 4, text='check', kind=wx.ITEM_CHECK)
+    mn_file.Append(mi_check)
+    mi_sep = wx.MenuItem(mn_file, 5, text='sep', kind=wx.ITEM_SEPARATOR)
+    mn_file.Append(mi_sep)
+    mi_drop = wx.MenuItem(mn_file, 6, text='max', kind=wx.ITEM_DROPDOWN)
+    mn_file.Append(mi_drop)
+    
+    dl = wx.Dialog(frame, title='exmaple dialog')
+    wx.Button(dl, label='123', id=wx.ID_OK)
+    btn1 = wx.Button(frame, label='Modal Dialog')
+    btn1.Bind(wx.EVT_BUTTON, lambda e: print(dl.ShowModal()))
+    bs.Add(btn1)
+    btn2 = wx.Button(frame, label='Modeless Dialog')
+    btn2.Bind(wx.EVT_BUTTON, lambda e: print(dl.Show()))
+    bs.Add(btn2)
+    
+    mb = wx.MessageBox(message='message', caption='caption')
+    btn3 = wx.Button(frame, label='Message Box')
+    btn3.Bind(wx.EVT_BUTTON, lambda e: print(mb))
+
+def init1(frame: wx.Frame):
+    frame.tm = wx.Timer(frame)
+    print(123)
+    def timerEvent(event):
+        print("gejib")
+    frame.Bind(wx.EVT_TIMER, timerEvent, frame.tm)
+    print(frame.tm.Start(1000))
+    frame.tm.Stop()
+    print(frame.tm.Start(1000))
+
+def init1_(frame: wx.Frame):
+    frame.SetSize(1024, 760)
+    
+    
+    # pnl_l = wx.Panel(frame)
+    # pnl_r = wx.Panel(frame)
+    
+    anb = wx.aui.AuiNotebook(frame, style=wx.aui.AUI_NB_DEFAULT_STYLE | wx.aui.AUI_NB_TAB_MOVE | wx.aui.AUI_NB_WINDOWLIST_BUTTON)
+    
+    pnl_1 = wx.Panel(anb)
+    pnl_2 = wx.Panel(anb)
+    pnl_3 = wx.Panel(anb)
+    pnl_4 = wx.Panel(anb)
+    anb.AddPage(pnl_1, '介电常数')
+    anb.AddPage(pnl_2, '耗角正切')
+    anb.AddPage(pnl_3, '磁导率')
+    anb.AddPage(pnl_4, '磁损耗角正切')
+
+    fig = Figure()
+    setplot(pnl_1)
+
+    # bs = wx.BoxSizer()
+    # bs.Add(pnl_l, 0, flag=wx.EXPAND)
+    # bs.Add(pnl_r, 1, flag=wx.EXPAND)
+    # frame.SetSizer(bs)
+
+def init2_(frame: wx.Frame):
+    pnl = wx.Panel(frame)
+    bs1 = wx.BoxSizer(wx.VERTICAL)
+    def add(arr):
+        bs = wx.BoxSizer(wx.HORIZONTAL)
+        for x in arr:
+            bs.Add(x, flag=wx.ALL, border=2)
+        bs1.Add(bs)
+    add([wx.StaticText(pnl, label='freq: ', size=(75,-1)), wx.ComboBox(pnl, value='2'), wx.StaticText(pnl, label='GHz')])
+    add([wx.StaticText(pnl, label='介电常数: ', size=(75,-1)), wx.TextCtrl(pnl)])
+    add([wx.StaticText(pnl, label='耗角正切: ', size=(75,-1)), wx.TextCtrl(pnl)])
+    add([wx.StaticText(pnl, label='磁导率: ', size=(75,-1)), wx.TextCtrl(pnl)])
+    add([wx.StaticText(pnl, label='磁损耗角正切: ', size=(75,-1)), wx.TextCtrl(pnl)])
+    pnl.SetSizer(bs1)
+    bs1.Fit(pnl)
+
+def setplot(pnl: wx.Panel):
+    
+    fig = Figure()
+    axes = fig.add_subplot(111, xlim=(1,10), ylim=(1, 10))
+    # axes.set_facecolor('cyan')
+    axes.set_title('Example Plot')
+    # 小刻度
+    axes.minorticks_on()
+    """
+    which:
+        major - 设置主刻度的延长线
+        minor - 设置小刻度的延长线
+        both - 设置主刻度和小刻度的延长线
+    """
+    axes.grid(visible=True, which='major', color='green', linestyle='-', alpha=0.5)
+    axes.grid(visible=True, which='minor', color='green', linestyle='--', alpha=0.2)
+    axes.set_xlabel('freq')
+    axes.set_ylabel('')
+    
+    fc = FigureCanvasWxAgg(pnl, -1, fig)
+    nt = NavigationToolbar2Wx(fc)
+    
+    bs = wx.BoxSizer(wx.VERTICAL)
+    bs.Add(fc, 1, flag=wx.ALL | wx.EXPAND, border=2)
+    bs.Add(nt, 0, flag=wx.ALL | wx.EXPAND, border=2)
+    pnl.SetSizer(bs)
+    bs.Fit(pnl)
+    
+    # axes.plot(range(1,11), range(1,11))
+    # axes.plot(range(1,11), [10,9,8,7,6,5,4,3,2,1])
+    
+if __name__ == '__main__':
+    app = wx.App()
+    frame = wx.Frame(None)
+    init1(frame)
+    frame.Centre()
+    frame.Show(True)
+    app.MainLoop()

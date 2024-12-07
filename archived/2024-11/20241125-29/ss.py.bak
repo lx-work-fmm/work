@@ -1,0 +1,4 @@
+import os
+print(os.path.join(r'E:\codespaces\projects\fm81-cylinder\fm81x01-develop\Sources', ''))
+print(os.path.join(r'E:\codespaces\projects\fm81-cylinder\fm81x01-develop\Sources', '\\'))
+print(os.path.join(r'E:\codespaces\projects\fm81-cylinder\fm81x01-develop\Sources', '/'))

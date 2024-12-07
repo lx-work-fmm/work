@@ -1,0 +1,406 @@
+import pyvisa
+rm = pyvisa.ResourceManager()
+print(rm)
+
+class Instrument():
+    """
+    仪器类
+    """
+    def __init__(self, type):
+        """
+        type:
+            N5183B - 信号发生器
+            N9010B - 频谱仪
+        """
+        self.type = type
+        self.connect()
+    
+    def connect(self):
+        """
+        :return:
+            0 -> success
+            1 -> Fail to open
+            2 -> not founded
+        """
+        res_list = rm.list_resources()
+        print(res_list)
+        
+        for v in res_list:
+            if self.type in v:
+                try:
+                    self.h = rm.open_resource(v)
+                    self.h.read_termination = '\n'
+                    # self.h.write_termination = '\n'
+                    print(123, self.h)
+                except:
+                    wx.MessageBox(f'Fail to open Instrument {self.type}')
+                    return 1
+                    # raise Exception(f'Fail to open Instrument {self.type}') 
+                break
+        
+        if self.is_connected():
+            return 0
+        else:
+            return 2
+        
+    def is_connected(self):
+        try:
+            print(123, self.query('*IDN?'))
+            return True
+        except:
+            return False
+    
+    def test_connection_or_reconnect(self):
+        if not hasattr(self, 'h'):
+            if wx.MessageBox('try to connect?', caption=f'Instrument {self.type} not connected', style=wx.YES_NO|wx.YES_DEFAULT|wx.ICON_WARNING) == wx.YES:
+                if self.connect() != 0:
+                    return self.test_connection_or_reconnect()
+                else:
+                    return True
+            else:
+                print(f'Instrument {self.type} not connected')
+                return False
+        else:
+            return True
+    
+    def write(self, cmd):
+        self.h.write(cmd)
+        
+    def query(self, cmd):
+        return self.h.query(cmd)
+    
+# 信号发生器
+class Source(Instrument):
+    """
+    
+    """
+    # 192.168.1.100
+    def __init__(self, type='N5183B'):
+        super().__init__(type)
+        # print('[src freq]')
+        # print('center:', self.query(':FREQ:CENT?'))
+        # print('center min:', self.query(':FREQ:CENT? MIN'))
+        # print('center max:', self.query(':FREQ:CENT? MAX'))
+        # print('mode:', self.query(':FREQ:MODE?'))
+        # print('ref:', self.query(':FREQ:REF?'))
+        # print('ref stat:', self.query(':FREQ:REF:STAT?'))
+        # print('offset stat:', self.query(':FREQ:OFFS?'))
+        # print('offset stat:', self.query(':FREQ:OFFS:STAT?'))
+        # print('multiplier:', self.query(':FREQ:MULT?'))
+        # print('fiexd:', self.query(':FREQ:FIX?'))
+        # print('[src amp]')
+        # print('state:', self.query(':MARK:AMPL?'))
+        # print('value:', self.query(':MARK:AMPL:VAL?'))
+        # print('[src output]')
+        # print('MOD:', self.query(':OUTP:MOD:STAT?'))
+        # print('RF:', self.query(':OUTP:STAT?'))
+        # print('[src source]')
+        # print('power reference:', self.query(':SOUR:POW:REF?'))
+        # print('power reference stat:', self.query(':SOUR:POW:REF:STAT?'))
+        # print('power start:', self.query(':SOUR:POW:STAR?'))
+        # print('power stop:', self.query(':SOUR:POW:STOP?'))
+        # print('power level immediate amplitude:', self.query(':SOUR:POW:LEV:IMM:AMPL?')) # 或 POW?
+        
+        
+    def test(self):
+        # self.write(':FREQuency:REFerence 5GHz')
+        # self.write(':FREQuency 2GHz')
+        print(self.query(':FREQuency?'))
+        print(self.query(':FREQuency:FIXed?'))
+        print(self.query(':FREQuency:REFerence?'))
+        print(self.query(':FREQuency:START?'))
+        print(self.query(':FREQuency:STOP?'))
+        print(self.query(':FREQuency:SPAN?'))
+        print(self.query(':FREQuency:LSPurs:STATe?'))
+        print(self.query(':FREQuency:MODE?'))
+
+# 频谱仪
+class Spectrum(Instrument):
+    # 192.168.31.102
+    def __init__(self, type='N9010B'):
+        super().__init__(type)
+        # print('spec')
+    
+    def set_freq(self, freq):
+        self.h.write(f'CALC:MARK1:X {freq}GHz')
+    
+    def read(self):
+        return self.h.query(f'CALC:MARK1:Y?')
+
+    def test(self):
+        pass
+
+import wx
+
+class InputText(wx.Window):
+    def __init__(self, parent, label='', value=''):
+        super().__init__(parent)
+        self.bs = wx.BoxSizer(wx.HORIZONTAL)
+        
+        self.st = wx.StaticText(self, label=label)
+        self.tc = wx.TextCtrl(self, value=value, style=wx.TE_RICH2)
+        
+        self.bs.Add(self.st, flag=wx.RIGHT, border=10)
+        self.bs.Add(self.tc, )
+        self.SetSizer(self.bs)
+    
+    def getValue(self):
+        return self.tc.Value
+
+class PathSelector(wx.Window):
+    def __init__(self, parent: wx.Window, file_or_dir = 0, label = None, value = ''):
+        """
+        file_or_dir
+            0 -> file
+            1 -> dir
+        """
+        super().__init__(parent)
+        self.file_or_dir = file_or_dir
+        self.bs = wx.BoxSizer(wx.HORIZONTAL)
+        
+        self.btn_select = wx.Button(self)
+        self.tc = wx.TextCtrl(self, size=(240,-1), style=wx.TE_RICH2, value=value)
+        self.tc_err = wx.TextCtrl(self, size=(22,-1), value='*', style=wx.TE_RICH2|wx.TE_READONLY|wx.TE_CENTER)
+        self.tc_err.SetStyle(0,1,wx.TextAttr('red','white'))
+        
+        self.bs.Add(self.btn_select, flag=wx.RIGHT, border=10)
+        self.bs.Add(self.tc)
+        self.bs.Add(self.tc_err)
+        self.SetSizer(self.bs)
+        
+        if file_or_dir == 0:
+            self.dlg = wx.FileDialog(self, 'select a file')
+            self.btn_select.SetLabel(label or '选择文件')
+        elif file_or_dir == 1:
+            self.dlg = wx.DirDialog(self, 'select a directory')
+            self.btn_select.SetLabel(label or '选择目录')
+        else:
+            raise Exception(f'file_or_dir = 0 | 1, not {file_or_dir}')
+        # self.flag_error_path = True
+        self.on_tc_change(None)
+        
+        self.BindEvents()
+        
+    def BindEvents(self):
+        self.Bind(wx.EVT_BUTTON, self.on_btn_click, self.btn_select)
+        self.Bind(wx.EVT_TEXT, self.on_tc_change, self.tc, )
+    
+    def on_btn_click(self, e):
+        if e:
+            e.Skip()
+        if self.dlg.ShowModal() == wx.ID_OK:
+            self.tc.SetValue(self.dlg.GetPath())
+            # self.tc.SetToolTip(self.dlg.GetPath())
+    
+    def on_tc_change(self, e):
+        if e:
+            e.Skip()
+        # print(self.tc.MinWidth, self.tc.CharWidth*len(self.tc.Value))
+        if self.tc.MinWidth < self.tc.CharWidth*len(self.tc.Value):
+            self.tc.SetToolTip(self.tc.Value)
+        else:
+            self.tc.UnsetToolTip()
+        
+        import os
+        if self.file_or_dir == 0 and os.path.isfile(self.tc.Value) or \
+            self.file_or_dir == 1 and os.path.isdir(self.tc.Value):
+            self.tc_err.SetStyle(0,1,wx.TextAttr('green','white'))
+            self.flag_error_path = False
+        elif self.file_or_dir == 0 and os.path.isdir(os.path.dirname(self.tc.Value)):
+            self.tc_err.SetStyle(0,1,wx.TextAttr('yellow','white'))
+            self.flag_error_path = False
+        elif self.file_or_dir == 0 and not os.path.isfile(self.tc.Value) or \
+            self.file_or_dir == 1 and not os.path.isdir(self.tc.Value):
+            self.tc_err.SetStyle(0,1,wx.TextAttr('red','white'))
+            self.flag_error_path = True
+
+    def getValue(self):
+        return self.tc.Value
+    
+class MainFrame(wx.Frame):
+    def __init__(self, *args, **kw):
+        super().__init__(None, title='RFTester', *args, **kw)
+        pnl = wx.Panel(self)
+        gbs = wx.GridBagSizer(10,10)
+        
+        self.it_start = InputText(pnl, 'Start(GHz):', '2')
+        self.it_stop = InputText(pnl, 'Stop(GHz):', '6')
+        self.it_point = InputText(pnl, 'Point:', '5')
+        self.it_amp = InputText(pnl, 'Amplitude(dBm):', '-20')
+        self.ps = PathSelector(pnl, label='选择输出文件', value=r'C:\Users\Administrator\Desktop\test.csv')
+        self.it_delay = InputText(pnl, 'Test Delay(s):', '0.4')
+        self.btn_start = wx.Button(pnl, label='Start Test')
+        
+        gbs.Add((10,10), (5,4))
+        gbs.Add(self.it_start, (1,1))
+        gbs.Add(self.it_stop, (1,2))
+        gbs.Add(self.it_point, (1,3))
+        gbs.Add(self.it_amp, (2,1), span=(1,2))
+        gbs.Add(self.it_delay, (3,3))
+        gbs.Add(self.ps, (4,1), span=(1,2))
+        gbs.Add(self.btn_start, (4,3), flag=wx.EXPAND|wx.LEFT, border=30)
+        pnl.SetSizer(gbs)
+        
+        # gbs.Fit(pnl)
+        gbs.Fit(self)
+    
+    def testing(self, flag: bool = True):
+        if flag:
+            self.btn_start.SetLabel('Stop')
+        else:
+            self.btn_start.SetLabel('Start Test')
+        
+        flag = not flag
+        self.it_start.tc.Enable(flag)
+        self.it_stop.tc.Enable(flag)
+        self.it_point.tc.Enable(flag)
+        self.it_amp.tc.Enable(flag)
+        # self.ps.Enable(flag)
+    
+        
+class Main():
+    def __init__(self):
+        app = wx.App()
+        self.view = MainFrame()
+        
+        self.src = Source()
+        self.spec = Spectrum()
+        
+        self.flag_testing = False
+        
+        self.Bind_Events()
+        
+        self.view.Show()
+        app.MainLoop()
+        
+    
+    def Bind_Events(self):
+        self.view.Bind(wx.EVT_BUTTON, self.on_start_or_stop, self.view.btn_start)
+        # self.view.Bind(wx.EVT_BUTTON, lambda e: print(111), self.view.ps.btn_select)
+    
+    def on_start_or_stop(self, e):
+        import threading
+        if not self.flag_testing:
+            self.flag_testing = True
+            self.view.testing(True)
+            threading.Thread(target=self.test, args=()).start()
+        else:
+            self.flag_testing = False
+            self.view.testing(False)
+    
+    def test(self):
+        print(self.view.it_start.getValue(), self.view.it_stop.getValue(), self.view.it_point.getValue(), self.view.ps.getValue())
+        import os
+        d = self.view.ps.getValue()
+        if self.view.ps.flag_error_path:
+            wx.MessageBox(f'"{d}" is not a file path')
+            
+            self.flag_testing = False
+            self.view.testing(False)
+            return
+        try:
+            start = float(self.view.it_start.getValue())
+            stop = float(self.view.it_stop.getValue())
+            point = int(self.view.it_point.getValue())
+            amp = float(self.view.it_amp.getValue())
+            delay = float(self.view.it_delay.getValue())
+            out_file = self.view.ps.getValue()
+        except ValueError:
+            wx.MessageBox("类型错误")
+            
+            self.flag_testing = False
+            self.view.testing(False)
+            return
+        
+        # self.flag_testing = True
+        # self.view.testing(True)
+        
+        self.test_core(start, stop, point, amp, delay, out_file)
+        
+        self.flag_testing = False
+        self.view.testing(False)
+    
+    def test_core(self, start, stop, point, amp, delay, out_file = './output.csv'):
+        print('start test...')
+        if not self.src.is_connected() and not self.src.test_connection_or_reconnect():
+            return
+        if not self.spec.is_connected() and not self.spec.test_connection_or_reconnect():
+            return
+
+        import numpy as np
+        freqs = np.linspace(start, stop, point)
+        res = []
+        
+        # (1) 配置信号发生器
+        self.src.write('FREQ:REF:STAT OFF')
+        self.src.write('FREQ:OFFS:STAT OFF')
+        # 关 MODulation, 开 RF
+        self.src.write('OUTP:MOD:STAT OFF')
+        self.src.write('OUTP:STAT ON')
+        # 设置 amp
+        self.src.write(f'SOUR:POW {amp}')
+        self.view.it_amp.tc.SetValue(str(float(self.src.query('SOUR:POW?'))))
+        
+        
+        # (2) 配置频谱仪
+        print(f'pre:: start: {self.spec.query("SENS:FREQ:STAR?")}, stop: {self.spec.query("SENS:FREQ:STOP?")}')
+        self.spec.write(f'SENS:FREQ:STAR {start}GHz')
+        self.spec.write(f'SENS:FREQ:STOP {stop}GHz')
+        # self.spec.write(f'SENS:FREQ:CENT {6}GHz')
+        # self.spec.write(f'SENS:FREQ:SPAN {10}GHz')
+        print(f'now:: start: {self.spec.query("SENS:FREQ:STAR?")}, stop: {self.spec.query("SENS:FREQ:STOP?")}')
+        # print(self.spec.query("SENS:FREQ:CENT?"), self.spec.query("SENS:FREQ:SPAN?"))
+        self.spec.write(f'CALC:MARK1:STAT OFF')
+        
+        x = float(self.spec.query('CALC:MARK1:X?'))/(10**9)
+        y = float(self.spec.query('CALC:MARK1:Y?'))
+        for freq in freqs:
+            if not self.flag_testing:
+                print('manual stop...')
+                return
+            
+            import time
+            
+            # () 发信号
+            self.src.write(f':FREQuency {freq}GHz')
+            time.sleep(delay)
+            
+            # () 收信号
+            # self.spec.write(f'CALC:MARK1:X {freq}GHz')
+            # # print(self.spec.query(f'CALC:MARK1:FUNC:EXEC?'))
+            # ret = float(self.spec.query(f'CALC:MARK1:Y?'))
+            self.spec.write('CALC:MARK1:MAX')
+            # time.sleep(delay)
+            x = float(self.spec.query('CALC:MARK1:X?'))/(10**9)
+            y = float(self.spec.query('CALC:MARK1:Y?'))
+            self.spec.write(f'CALC:MARK1:X {freq}GHz')
+            y1 = float(self.spec.query(f'CALC:MARK1:Y?'))
+            print(freq, y1, x, y)
+            # res.append([freq, y1, x, y])
+            res.append([freq, y])
+        import csv
+        def save(out_file):
+            try:
+                csv.writer(open(out_file, 'w', newline='\n')).writerows(res)
+                wx.MessageBox('success', style=wx.ICON_INFORMATION)
+            except:
+                if wx.MessageBox('change path and try again?', caption='save error', style=wx.YES_NO|wx.YES_DEFAULT|wx.ICON_WARNING) == wx.YES:
+                    self.view.ps.on_btn_click(None)
+                    save(self.view.ps.tc.Value)
+        save(out_file)
+    
+    
+    def debug(self):
+        self.src.test()
+        self.spec.test()
+
+
+if __name__ == '__main__':
+    DEBUG = False
+    if DEBUG:
+        pass
+        # Main().debug()
+        print(rm.list_resources())
+        
+    else:
+        Main()

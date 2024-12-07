@@ -1,0 +1,29 @@
+import sys
+sys.path.insert(0, r'E:\codespaces\projects')
+from lib.csv import write_csv, read_csv
+
+def get_refsat(gain_file: str, eff_file: str):
+    """
+    输入：一个增益曲线csv，一个效率曲线csv
+    输出：refsat文件，具体格式之前已经发给梁工
+    """
+    import os
+    print(os.path.abspath(gain_file))
+    gain = read_csv(gain_file)
+    eff = read_csv(eff_file)
+
+    res = []
+    for g, e in zip(gain, eff):
+        try:
+            assert g[0] == e[0]
+            freq = g[0]
+            res.append((freq, 0, float(g[1]), float(e[1])))
+        except:
+            pass
+    write_csv('./4/out.refsat', res, delimiter = '\t')
+
+if __name__ == '__main__':
+    import os
+    os.chdir(os.path.dirname(__file__))
+    get_refsat('./1/losVV_A2B_400MHz-out.csv', './2/S11/600MHz_1_S11-out.csv')
+

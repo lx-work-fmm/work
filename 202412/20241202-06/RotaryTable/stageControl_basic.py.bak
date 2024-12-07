@@ -1,0 +1,837 @@
+# coding=utf-8
+import socket
+import time
+import ctypes as ct
+import copy
+import struct
+#写寄存器命令，命令索引从0开始，位1是识别编号，命令中第6位是帧总长度，第13位是13-LAST的命令长度，第14位是寄存器数量x2,第18-19是寄存器地址，第20-21位是写入寄存器数量，往后是寄存器数据占两个字节，多个寄存器*n
+# sendcomd_write  =   b'\x11\x00\x00\x00\x00\x00\x18\x00\x00\x00\x00\x00\x08\x02\x20\x0b\x10\x00\x32\x00\x01\x00'
+                #      0    1    2  3   4    5   6   7  8   9   10  11  12  13  14  15  16  17  18  19  20   21 
+sendcomd_write  =    [0x11,0x00,0x00,0x00,0x00,0x00,0x18,0x00 ,0x00,0x00,0x00,0x00]#,0x08,0x02,0x20,0x0b,0x10,0x00,0x32,0x00,0x01,0x00]
+
+#写寄存器命令返回值，命令索引从0开始，命令中第6位是帧总长度，第13位是响应总长度.
+#读寄存器命令，命令索引从0开始，命令中第六位是帧总长度，第13位是13-LAST的命令长度，第18-19位是寄存器地址
+# sendcomd_read   =   b'\x11\x00\x00\x00\x00\x00\x16\x00\x00\x00\x00\x00\x08\x00\x20\x09\x10\x00\x00\x00\x0a\x00'
+sendcomd_read_str   =   b'\x11\x00\x00\x00\x00\x00\x16\x00\x00\x00\x00\x00\x08\x00\x20\x09\x10\x00\x00\x00\x0a\x00'
+sendcomd_read   =    [0x11,0x00,0x00,0x00,0x00,0x00,0x16,0x00,0x00,0x00,0x00,0x00]#,0x08,0x00,0x20,0x09,0x10,0x00,0x00,0x00,0x0a,0x00]
+#=================命令====================
+#控制寄存器的地址MW50
+REG_COL_INDEX= [0x32,1]
+REG_COL_INDEX2= [0x3C,1]
+
+#控制软件硬件触发的寄存器地址MB523
+REG_COL2_INDEX = [0x34,1]
+#控制ExtTrig命令
+REG_D_ExtTrig = [0x02,0x00]
+#控制寄存器的控制命令
+REG_D_START=[0x01,0x00]
+REG_D_STOP=[0x02,0x00]
+REG_D_MSTOP=[0x20,0x00]
+REG_D_MOVER=[0x10,0x00]
+REG_D_MOVEL=[0x08,0x00]
+REG_D_ZERO=[0x80,0x00]
+REG_D_LAST=[0x00,0x01]
+REG_D_CLEAR=[0x00,0x20]
+#初始化
+REG_D_INIT=[0x04,0x00]
+#=================轴一寄存器======================
+#设置速度寄存器MW51
+REG_SPEED_INDEX=[0x33,1]
+# #
+# REG_TANG_INDEX=[0x34,1]
+#MW56反馈速度寄存器
+REG_feedback_speed_INDEX=[0x38,1]
+#MW57反馈力矩寄存器
+REG_feedback_monent_INDEX=[0x39,1]
+#获取位置寄存器ML70
+REG_GPOS_INDEX=[0x46,2]
+#设置位置寄存器ML72
+REG_SPOS_INDEX=[0x48,2]
+#获取1ppsTTL的数值ML74
+REG_GET_TTL_INDEX=[0x4a,2]
+#获取角度和脉冲寄存器和TTL的值
+REG_GET_TANG_AND_PULSE_INDEX=[0x46,6]
+#获取状态寄存器MW54
+REG_GSTATUS_INDEX=[0x36,1]
+#=================轴二寄存器======================
+#设置速度寄存器MW61
+REG_SPEED_INDEX2=[0x3D,1]
+# #
+# REG_TANG_INDEX=[0x34,1]
+#MW66反馈速度寄存器
+REG_feedback_speed_INDEX2=[0x42,1]
+#MW67反馈力矩寄存器
+REG_feedback_monent_INDEX2=[0x43,1]
+#获取位置寄存器ML80
+REG_GPOS_INDEX2=[0x50,2]
+#设置位置寄存器ML82
+REG_SPOS_INDEX2=[0x52,2]
+#获取状态寄存器MW64
+REG_GSTATUS_INDEX2=[0x40,1]
+
+class stageControl_basic(object):
+    
+    def __init__(self):
+        self.MotorDire = -1
+        self.__pos=10
+        self.__ip=None
+        self.__buffer={0:'',1:''}
+        #这是ID号列表
+        tmp2={'Connect':False,'offset':0,'serial':0,'IP':''}
+        self.__ID={1:tmp2.copy(),2:tmp2.copy()}
+        self.__ID[2]['offset']=10
+        self.__ID[2]['serial']=2
+        self.__ID[1]['serial']=1
+        self.__ID[1]['offset']=0
+        self.HANDWARE_SOCKET=socket.socket(socket.AF_INET,socket.SOCK_DGRAM)
+        self.HANDWARE_SOCKET.settimeout(3)
+        self.__ID[1]['IP']=('192.168.255.33',10001)
+        self.__ID[2]['IP']=('192.168.255.33',10001)
+        pass
+    
+    """lx
+    发送一条 字节串 来初始化转台
+    """
+    def setConnect(self,ip=('192.168.255.33',10001),_id=1):
+        '''
+            连接函数
+        '''     
+        # _id=1
+        self.__ID[_id]['Connect']=True
+        self.__ID[_id]['IP']=ip
+        # self.ip=ip
+        try:
+            # print('in')
+            self.HANDWARE_SOCKET.sendto(sendcomd_read_str,self.__ID[_id]['IP'])
+            rc,ip=self.HANDWARE_SOCKET.recvfrom(1024)
+            if rc!=None:
+                print('stageControl connect is succeed!')
+                return 0
+            else:
+                print('stageControl connect is fail!')
+                return 1
+        except  Exception as e:
+            print('stageControl setConnect Eroor:%s'%e)
+            return 1
+
+    def sendcmd(self,cmd,_id=1):
+        # _id=1
+        oft=cmd[18]
+        oft+=self.__ID[_id]['offset']
+        cmd[18]=oft #('%%0%dx'%(1 << 1)%oft).decode('hex')[-1:]
+        len218=len(cmd)
+        cmd[6]=len218#('%%0%dx'%(1 << 1)%len218).decode('hex')[-1:]
+        lenEMEM=len(cmd[13:])
+        cmd[13]=lenEMEM#('%%0%dx'%(1 << 1)%lenEMEM).decode('hex')[-1:]
+        # print('cmd:%s'%cmd)
+        cmde = b''
+        for ii in cmd:
+            cmde += struct.pack('B',ii)
+        self.HANDWARE_SOCKET.sendto(cmde,('192.168.255.33',10001))#self.__ID[_id]['IP']
+        pass
+
+    def recvcmd(self,_id=1):
+        #接收数据
+        try:
+            data,address=self.HANDWARE_SOCKET.recvfrom(100000)
+            
+            return data
+        except Exception as e:
+            # print('stageControl recvcmd Error:%s'%e)
+            return 1
+        # if self.__ID[_id]['IP'][0]==address:
+        #         return True
+        # print(data,address)
+        pass
+
+    def setLast(self,_id):
+        '''
+            设置上一次位置
+        '''
+        cmd=copy.copy(sendcomd_write)
+        #初始化值
+        # cmd[1]=_id
+        #设定命令的Length n*2
+        n=REG_COL_INDEX[1]*2+8
+        s=[]
+        # n1=[int(ii.encode('hex'),16) for ii in list(('%%0%dx'%(2 << 1)%n).decode('hex')[-2:])]
+        [s.append(n>>(i*8)&0xff) for i in range(2)]
+        # n1.reverse()
+        cmd+=s
+        #设定命令的主要函数MFC
+        cmd+=[0x20]
+        #设定命令的次要函数SFC
+        cmd+=[0x0b]#读取保持寄存器内容
+        #分别设定4位发送目标CPU编号与发送源编号
+        cmd+=[0x10]
+        #预留SPARE
+        cmd+=[0x00]
+        #设定要写入的保持寄存器开头地址
+        # n2=[int(ii.encode('hex'),16) for ii in list(('%%0%dx'%(2 << 1)%REG_COL_INDEX[0]).decode('hex')[-2:])]
+        s=[]
+        [s.append(REG_COL_INDEX[0]>>(i*8)&0xff) for i in range(2)]
+        # n2.reverse()
+        cmd+=s
+        #设定要写入的保持寄存器数量
+        # n3=[int(ii.encode('hex'),16) for ii in list(('%%0%dx'%(2 << 1)%REG_COL_INDEX[1]).decode('hex')[-2:])]
+        s2=[]
+        [s2.append(REG_COL_INDEX[1]>>(i*8)&0xff) for i in range(2)]
+        # n3.reverse()
+        cmd+=s2
+        #设定要写入的保持寄存器内容
+        cmd+=REG_D_LAST
+        self.sendcmd(cmd,_id)
+        rc=self.recvcmd()
+        #解析响应数据，判断是否完成
+        
+        return rc
+
+    def setZero(self,_id=1):
+        '''
+            设置原点位置
+        '''
+        cmd=copy.copy(sendcomd_write)
+        if _id == 1:
+            #初始化值
+            # cmd[1]=_id
+            #设定命令的Length n*2
+            n=REG_COL_INDEX[1]*2+8
+            # n1=[int(ii.encode('hex'),16) for ii in list(('%%0%dx'%(2 << 1)%n).decode('hex')[-2:])]
+            s=[]
+            [s.append(n>>(i*8)&0xff) for i in range(2)]
+            # n1.reverse()
+            cmd+=s
+            #设定命令的主要函数MFC
+            cmd+=[0x20]
+            #设定命令的次要函数SFC
+            cmd+=[0x0b]#读取保持寄存器内容
+            #分别设定4位发送目标CPU编号与发送源编号
+            cmd+=[0x10]
+            #预留SPARE
+            cmd+=[0x00]
+            #设定要写入的保持寄存器开头地址
+            # n2=[int(ii.encode('hex'),16) for ii in list(('%%0%dx'%(2 << 1)%REG_COL_INDEX[0]).decode('hex')[-2:])]
+            s2=[]
+            [s2.append(REG_COL_INDEX[0]>>(i*8)&0xff) for i in range(2)]        
+            # n2.reverse()
+            cmd+=s2
+            #设定要写入的保持寄存器数量
+            # n3=[int(ii.encode('hex'),16) for ii in list(('%%0%dx'%(2 << 1)%REG_COL_INDEX[1]).decode('hex')[-2:])]
+            s3=[]
+            [s3.append(REG_COL_INDEX[1]>>(i*8)&0xff) for i in range(2)]
+            # n3.reverse()
+            cmd+=s3
+            #设定要写入的保持寄存器内容
+            cmd+=REG_D_ZERO
+            # cmd+=[int(ii.encode('hex'),16) for ii in list(('%%0%dx'%(4 << 1)%speed).decode('hex')[-4:])]
+            self.sendcmd(cmd,_id)
+            rc=self.recvcmd()
+            #解析响应数据，判断是否完成
+        else:
+            #初始化值
+            # cmd[1]=_id
+            #设定命令的Length n*2
+            n=REG_COL_INDEX2[1]*2+8
+            # n1=[int(ii.encode('hex'),16) for ii in list(('%%0%dx'%(2 << 1)%n).decode('hex')[-2:])]
+            s=[]
+            [s.append(n>>(i*8)&0xff) for i in range(2)]
+            # n1.reverse()
+            cmd+=s
+            #设定命令的主要函数MFC
+            cmd+=[0x20]
+            #设定命令的次要函数SFC
+            cmd+=[0x0b]#读取保持寄存器内容
+            #分别设定4位发送目标CPU编号与发送源编号
+            cmd+=[0x10]
+            #预留SPARE
+            cmd+=[0x00]
+            #设定要写入的保持寄存器开头地址
+            # n2=[int(ii.encode('hex'),16) for ii in list(('%%0%dx'%(2 << 1)%REG_COL_INDEX2[0]).decode('hex')[-2:])]
+            s2=[]
+            [s2.append(REG_COL_INDEX2[0]>>(i*8)&0xff) for i in range(2)]        
+            # n2.reverse()
+            cmd+=s2
+            #设定要写入的保持寄存器数量
+            # n3=[int(ii.encode('hex'),16) for ii in list(('%%0%dx'%(2 << 1)%REG_COL_INDEX2[1]).decode('hex')[-2:])]
+            s3=[]
+            [s3.append(REG_COL_INDEX2[1]>>(i*8)&0xff) for i in range(2)]
+            # n3.reverse()
+            cmd+=s3
+            #设定要写入的保持寄存器内容
+            cmd+=REG_D_ZERO
+            # cmd+=[int(ii.encode('hex'),16) for ii in list(('%%0%dx'%(4 << 1)%speed).decode('hex')[-4:])]
+            self.sendcmd(cmd,_id)
+            rc=self.recvcmd()
+            #解析响应数据，判断是否完成
+        return rc
+
+
+    def setExtTrig(self,mode):
+        '''
+            设置软件触发还是硬件触发 mode=1为硬件触发，mode=0为软件触发
+        '''
+        cmd=copy.copy(sendcomd_write)
+        #初始化值
+        # cmd[1]=_id
+        #设定命令的Length n*2
+        n=REG_COL_INDEX[1]*2+8
+        # n1=[int(ii.encode('hex'),16) for ii in list(('%%0%dx'%(2 << 1)%n).decode('hex')[-2:])]
+        s=[]
+        [s.append(n>>(i*8)&0xff) for i in range(2)]
+        # n1.reverse()
+        cmd+=s
+        #设定命令的主要函数MFC
+        cmd+=[0x20]
+        #设定命令的次要函数SFC
+        cmd+=[0x0b]#读取保持寄存器内容
+        #分别设定4位发送目标CPU编号与发送源编号
+        cmd+=[0x10]
+        #预留SPARE
+        cmd+=[0x00]
+        #设定要写入的保持寄存器开头地址
+        # n2=[int(ii.encode('hex'),16) for ii in list(('%%0%dx'%(2 << 1)%REG_COL2_INDEX[0]).decode('hex')[-2:])]
+        s2=[]
+        [s2.append(REG_COL2_INDEX[0]>>(i*8)&0xff) for i in range(2)]
+        # n2.reverse()
+        cmd+=s2
+        #设定要写入的保持寄存器数量
+        # n3=[int(ii.encode('hex'),16) for ii in list(('%%0%dx'%(2 << 1)%REG_COL2_INDEX[1]).decode('hex')[-2:])]
+        s3=[]
+        [s3.append(REG_COL2_INDEX[1]>>(i*8)&0xff) for i in range(2)]
+        # n3.reverse()
+        cmd+=s3
+        #设定要写入的保持寄存器内容
+        if mode == 1:
+            cmd+=REG_D_ExtTrig
+        else:
+            cmd+=[0x00,0x00]
+        # cmd+=[int(ii.encode('hex'),16) for ii in list(('%%0%dx'%(4 << 1)%speed).decode('hex')[-4:])]
+        self.sendcmd(cmd)
+        rc=self.recvcmd()
+        #解析响应数据，判断是否完成
+
+        return 0
+
+
+
+    def stop(self,_id=1):
+        '''
+            停止运动
+        '''
+        cmd=copy.copy(sendcomd_write)
+        #初始化值
+        # cmd[1]=_id
+        #设定命令的Length n*2
+        n=REG_COL_INDEX[1]*2+8
+        # n1=[int(ii.encode('hex'),16) for ii in list(('%%0%dx'%(2 << 1)%n).decode('hex')[-2:])]
+        s=[]
+        [s.append(n>>(i*8)&0xff) for i in range(2)]
+        # n1.reverse()
+        cmd+=s
+        #设定命令的主要函数MFC
+        cmd+=[0x20]
+        #设定命令的次要函数SFC
+        cmd+=[0x0b]#读取保持寄存器内容
+        #分别设定4位发送目标CPU编号与发送源编号
+        cmd+=[0x10]
+        #预留SPARE
+        cmd+=[0x00]
+        #设定要写入的保持寄存器开头地址
+        # n2=[int(ii.encode('hex'),16) for ii in list(('%%0%dx'%(2 << 1)%REG_COL_INDEX[0]).decode('hex')[-2:])]
+        s2=[]
+        [s2.append(REG_COL_INDEX[0]>>(i*8)&0xff) for i in range(2)]
+        # n2.reverse()
+        cmd+=s2
+        #设定要写入的保持寄存器数量
+        # n3=[int(ii.encode('hex'),16) for ii in list(('%%0%dx'%(2 << 1)%REG_COL_INDEX[1]).decode('hex')[-2:])]
+        s3=[]
+        [s3.append(REG_COL_INDEX[1]>>(i*8)&0xff) for i in range(2)]
+        # n3.reverse()
+        cmd+=s3
+        #设定要写入的保持寄存器内容
+        cmd+=REG_D_STOP
+        # cmd+=[int(ii.encode('hex'),16) for ii in list(('%%0%dx'%(4 << 1)%speed).decode('hex')[-4:])]
+        self.sendcmd(cmd,_id)
+        rc=self.recvcmd()
+        #解析响应数据，判断是否完成
+
+        return 0
+
+    def ClearAlarm(self,_id=1):
+        '''
+            清除报警
+        '''
+        cmd=copy.copy(sendcomd_write)
+        #初始化值
+        # cmd[1]=_id
+        #设定命令的Length n*2
+        n=REG_COL_INDEX[1]*2+8
+        # n1=[int(ii.encode('hex'),16) for ii in list(('%%0%dx'%(2 << 1)%n).decode('hex')[-2:])]
+        s=[]
+        [s.append(n>>(i*8)&0xff) for i in range(2)]
+        # n1.reverse()
+        cmd+=s
+        #设定命令的主要函数MFC
+        cmd+=[20]
+        #设定命令的次要函数SFC
+        cmd+=[9]#读取保持寄存器内容
+        #分别设定4位发送目标CPU编号与发送源编号
+        cmd+=[10]
+        #预留SPARE
+        cmd+=[0]
+        #设定要写入的保持寄存器开头地址
+        # n2=[int(ii.encode('hex'),16) for ii in list(('%%0%dx'%(2 << 1)%REG_COL_INDEX[0]).decode('hex')[-2:])]
+        s2=[]
+        [s2.append(REG_COL_INDEX[0]>>(i*8)&0xff) for i in range(2)]
+        # n2.reverse()
+        cmd+=s2
+        #设定要写入的保持寄存器数量
+        # n3=[int(ii.encode('hex'),16) for ii in list(('%%0%dx'%(2 << 1)%REG_COL_INDEX[1]).decode('hex')[-2:])]
+        s3=[]
+        [s3.append(REG_COL_INDEX[1]>>(i*8)&0xff) for i in range(2)]
+        # n3.reverse()
+        cmd+=s3
+        #设定要写入的保持寄存器内容
+        cmd+=REG_D_CLEAR
+        self.sendcmd(cmd,_id)
+        rc=self.recvcmd()
+        #解析响应数据，判断是否完成
+        
+        return 0
+
+    def setSpeed(self,speed=3,_id=1):
+        cmd=copy.copy(sendcomd_write)
+        #初始化值
+        # cmd[1]=_id
+        #设定命令的Length n*2
+        n=REG_SPOS_INDEX[1]*2+8
+        # n1=[int(ii.encode('hex'),16) for ii in list(('%%0%dx'%(4 << 1)%n).decode('hex')[-2:])]
+        s=[]
+        [s.append(n>>(i*8)&0xff) for i in range(2)]
+        # n1.reverse()
+        cmd+=s
+        #设定命令的主要函数MFC
+        cmd+=[0x20]
+        #设定命令的次要函数SFC
+        cmd+=[0x0b]#读取保持寄存器内容
+        #分别设定4位发送目标CPU编号与发送源编号
+        cmd+=[0x10]
+        #预留SPARE
+        cmd+=[0x00]
+        if _id == 1:
+            #设定要写入的保持寄存器开头地址
+            # n2=[int(ii.encode('hex'),16) for ii in list(('%%0%dx'%(2 << 1)%REG_SPOS_INDEX[0]).decode('hex')[-2:])]
+            s2=[]
+            [s2.append(REG_SPEED_INDEX[0]>>(i*8)&0xff) for i in range(2)]
+            # n2.reverse()
+            cmd+=s2
+            #设定要写入的保持寄存器数量
+            # n3=[int(ii.encode('hex'),16) for ii in list(('%%0%dx'%(2 << 1)%REG_SPOS_INDEX[1]).decode('hex')[-2:])]
+            s3=[]
+            [s3.append(REG_SPEED_INDEX[1]>>(i*8)&0xff) for i in range(2)]
+            # n3.reverse()
+            cmd+=s3
+            #设定要写入的保持寄存器内容
+            speed=int(speed*100)
+            # n4=[int(ii.encode('hex'),16) for ii in list(('%%0%dx'%(4 << 1)%speed).decode('hex')[-4:])]
+            s4=[]
+            [s4.append(speed>>(i*8)&0xff) for i in range(2)]
+            # n4.reverse()
+            cmd+=s4
+        else:
+            #设定要写入的保持寄存器开头地址
+            # n2=[int(ii.encode('hex'),16) for ii in list(('%%0%dx'%(2 << 1)%REG_SPOS_INDEX[0]).decode('hex')[-2:])]
+            s2=[]
+            [s2.append(REG_SPEED_INDEX2[0]>>(i*8)&0xff) for i in range(2)]
+            # n2.reverse()
+            cmd+=s2
+            #设定要写入的保持寄存器数量
+            # n3=[int(ii.encode('hex'),16) for ii in list(('%%0%dx'%(2 << 1)%REG_SPOS_INDEX[1]).decode('hex')[-2:])]
+            s3=[]
+            [s3.append(REG_SPEED_INDEX2[1]>>(i*8)&0xff) for i in range(2)]
+            # n3.reverse()
+            cmd+=s3
+            #设定要写入的保持寄存器内容
+            speed=int(speed*100)
+            # n4=[int(ii.encode('hex'),16) for ii in list(('%%0%dx'%(4 << 1)%speed).decode('hex')[-4:])]
+            s4=[]
+            [s4.append(speed>>(i*8)&0xff) for i in range(2)]
+            # n4.reverse()
+            cmd+=s4
+        self.sendcmd(cmd,_id)
+        rc=self.recvcmd()
+        #解析响应数据，判断是否完成
+
+        return rc
+
+    def setPosition(self,pos=0,_id=1):
+        '''
+            设置位置
+            POS:角度，整型
+        '''
+        cmd=copy.copy(sendcomd_write)
+        #初始化值
+        # cmd[1]=_id
+        #设定命令的Length n*2
+        n=REG_SPOS_INDEX[1]*2+8
+        # n1=[int(ii.encode('hex'),16) for ii in list(('%%0%dx'%(4 << 1)%n).decode('hex')[-2:])]
+        s=[]
+        [s.append(n>>(i*8)&0xff) for i in range(2)]
+        # n1.reverse()
+        cmd+=s
+        #设定命令的主要函数MFC
+        cmd+=[0x20]
+        #设定命令的次要函数SFC
+        cmd+=[0x0b]#读取保持寄存器内容
+        #分别设定4位发送目标CPU编号与发送源编号
+        cmd+=[0x10]
+        #预留SPARE
+        cmd+=[0x00]
+        if _id == 1:
+            #设定要写入的保持寄存器开头地址
+            # n2=[int(ii.encode('hex'),16) for ii in list(('%%0%dx'%(2 << 1)%REG_SPOS_INDEX[0]).decode('hex')[-2:])]
+            s2=[]
+            [s2.append(REG_SPOS_INDEX[0]>>(i*8)&0xff) for i in range(2)]
+            # n2.reverse()
+            cmd+=s2
+            #设定要写入的保持寄存器数量
+            # n3=[int(ii.encode('hex'),16) for ii in list(('%%0%dx'%(2 << 1)%REG_SPOS_INDEX[1]).decode('hex')[-2:])]
+            s3=[]
+            [s3.append(REG_SPOS_INDEX[1]>>(i*8)&0xff) for i in range(2)]
+            # n3.reverse()
+            cmd+=s3
+            #设定要写入的保持寄存器内容
+            pos=int(pos*10000)
+            # n4=[int(ii.encode('hex'),16) for ii in list(('%%0%dx'%(4 << 1)%speed).decode('hex')[-4:])]
+            s4=[]
+            [s4.append(pos>>(i*8)&0xff) for i in range(4)]
+            # n4.reverse()
+            cmd+=s4
+        else:
+            #设定要写入的保持寄存器开头地址
+            # n2=[int(ii.encode('hex'),16) for ii in list(('%%0%dx'%(2 << 1)%REG_SPOS_INDEX[0]).decode('hex')[-2:])]
+            s2=[]
+            [s2.append(REG_SPOS_INDEX2[0]>>(i*8)&0xff) for i in range(2)]
+            # n2.reverse()
+            cmd+=s2
+            #设定要写入的保持寄存器数量
+            # n3=[int(ii.encode('hex'),16) for ii in list(('%%0%dx'%(2 << 1)%REG_SPOS_INDEX[1]).decode('hex')[-2:])]
+            s3=[]
+            [s3.append(REG_SPOS_INDEX2[1]>>(i*8)&0xff) for i in range(2)]
+            # n3.reverse()
+            cmd+=s3
+            #设定要写入的保持寄存器内容
+            pos=int(pos*10000)
+            # n4=[int(ii.encode('hex'),16) for ii in list(('%%0%dx'%(4 << 1)%speed).decode('hex')[-4:])]
+            s4=[]
+            [s4.append(pos>>(i*8)&0xff) for i in range(4)]
+            # n4.reverse()
+            cmd+=s4
+        self.sendcmd(cmd,_id)
+        rc=self.recvcmd()
+        #解析响应数据，判断是否完成
+
+        return 0
+    
+    def getStatus(self,_id=1):
+        '''
+            获得状态与报警，返回字典{'ecoderError','motorError'}
+            未完成
+        '''
+        # self.__pos=pos
+        cmd=copy.copy(sendcomd_read)
+        #设定命令的Length（固定8）
+        cmd+=[0x08,0x00]
+        #设定命令的主要函数MFC
+        cmd+=[0x20]
+        #设定命令的次要函数SFC
+        cmd+=[0x09]#读取保持寄存器内容
+        #分别设定4位发送目标CPU编号与发送源编号
+        cmd+=[0x10]
+        #预留SPARE
+        cmd+=[0x00]
+        #填充读取的指令
+        # n=[int(ii.encode('hex'),16) for ii in list(('%%0%dx'%(2 << 1)%REG_COL_INDEX[0]).decode('hex')[-2:])]
+        s=[]
+        [s.append(REG_COL_INDEX[0]>>(i*8)&0xff) for i in range(2)]
+        # n.reverse()
+        cmd+=s
+        # n1=[int(ii.encode('hex'),16) for ii in list(('%%0%dx'%(2 << 1)%REG_COL_INDEX[1]).decode('hex')[-2:])]
+        s1=[]
+        [s1.append(REG_COL_INDEX[1]>>(i*8)&0xff) for i in range(2)]
+        # n1.reverse()
+        cmd+=s1
+        #发送命令
+        self.sendcmd(cmd,_id)
+        recv=self.recvcmd()
+        # if recv==1:
+            # return 999
+        # print(recv)
+        # pos=ct.c_int16(int(recv[-2:].encode('hex'),16)).value
+        # pos=ct.c_int16(int.from_bytes(recv[-2:],'little')).value
+        # print(pos)
+        return recv
+
+    def getPosition(self,_id=1):
+        '''
+            获得角度
+            返回整型
+        '''
+        # self.__pos=pos
+        cmd=copy.copy(sendcomd_read)
+        #设定命令的Length（固定8）
+        cmd+=[0x08,0x00]
+        #设定命令的主要函数MFC
+        cmd+=[0x20]
+        #设定命令的次要函数SFC
+        cmd+=[0x09]#读取保持寄存器内容
+        #分别设定4位发送目标CPU编号与发送源编号
+        cmd+=[0x10]
+        #预留SPARE
+        cmd+=[0x00]
+        if _id == 1:
+            #设定要读取的保持寄存器的开头地址
+            # n=[int(ii.encode('hex'),16) for ii in list(('%%0%dx'%(2 << 1)%REG_GPOS_INDEX[0]).decode('hex')[-2:])]
+            s=[]
+            [s.append(REG_GPOS_INDEX[0]>>(i*8)&0xff) for i in range(2)]
+            # n.reverse()
+            cmd+=s
+            #设定要读取的保持寄存器数量
+            # n2=[int(ii.encode('hex'),16) for ii in list(('%%0%dx'%(2 << 1)%REG_GPOS_INDEX[1]).decode('hex')[-2:])]
+            s1=[]
+            [s1.append(REG_GPOS_INDEX[1]>>(i*8)&0xff) for i in range(2)]
+            # n2.reverse()
+            cmd+=s1
+        else:
+            #设定要读取的保持寄存器的开头地址
+            # n=[int(ii.encode('hex'),16) for ii in list(('%%0%dx'%(2 << 1)%REG_GPOS_INDEX[0]).decode('hex')[-2:])]
+            s=[]
+            [s.append(REG_GPOS_INDEX2[0]>>(i*8)&0xff) for i in range(2)]
+            # n.reverse()
+            cmd+=s
+            #设定要读取的保持寄存器数量
+            # n2=[int(ii.encode('hex'),16) for ii in list(('%%0%dx'%(2 << 1)%REG_GPOS_INDEX[1]).decode('hex')[-2:])]
+            s1=[]
+            [s1.append(REG_GPOS_INDEX2[1]>>(i*8)&0xff) for i in range(2)]
+            # n2.reverse()
+            cmd+=s1
+        #发送命令
+        # print(cmd)
+        self.sendcmd(cmd,_id)
+        recv=self.recvcmd()
+        if recv==1:
+            # print("999")
+            return 999.0
+        # pos = ct.c_int32(int((recv[-1]+recv[-2]+recv[-3]+recv[-4]).encode('hex'),16)).value
+        # pos = ct.c_int32(int.from_bytes(recv[-4:],'little')).value
+        pos, = struct.unpack('i', recv[-4:])
+        # pos = recv[-4:]
+        # print("pos:",pos/10000)
+        return pos/10000.0
+
+    def setMotionStart(self,_id=1):
+        '''
+            启动运动
+        '''
+        cmd=copy.copy(sendcomd_write)
+        #初始化值
+        # cmd[1]=_id
+        if _id == 1:
+            #设定命令的Length n*2
+            n=REG_COL_INDEX[1]*2+8
+            # n1=[int(ii.encode('hex'),16) for ii in list(('%%0%dx'%(2 << 1)%n).decode('hex')[-2:])]
+            s=[]
+            [s.append(n>>(i*8)&0xff) for i in range(2)]
+            # n1.reverse()
+            cmd+=s
+            #设定命令的主要函数MFC
+            cmd+=[0x20]
+            #设定命令的次要函数SFC
+            cmd+=[0x0b]#读取保持寄存器内容
+            #分别设定4位发送目标CPU编号与发送源编号
+            cmd+=[0x10]
+            #预留SPARE
+            cmd+=[0x00]
+            #设定要写入的保持寄存器开头地址
+            # n2=[int(ii.encode('hex'),16) for ii in list(('%%0%dx'%(2 << 1)%REG_COL_INDEX[0]).decode('hex')[-2:])]
+            s2=[]
+            [s2.append(REG_COL_INDEX[0]>>(i*8)&0xff) for i in range(2)]
+            # n2.reverse()
+            cmd+=s2
+            #设定要写入的保持寄存器数量
+            # n3=[int(ii.encode('hex'),16) for ii in list(('%%0%dx'%(2 << 1)%REG_COL_INDEX[1]).decode('hex')[-2:])]
+            s3=[]
+            [s3.append(REG_COL_INDEX[1]>>(i*8)&0xff) for i in range(2)]
+            # n3.reverse()
+            cmd+=s3
+        else:
+            #设定命令的Length n*2
+            n=REG_COL_INDEX2[1]*2+8
+            # n1=[int(ii.encode('hex'),16) for ii in list(('%%0%dx'%(2 << 1)%n).decode('hex')[-2:])]
+            s=[]
+            [s.append(n>>(i*8)&0xff) for i in range(2)]
+            # n1.reverse()
+            cmd+=s
+            #设定命令的主要函数MFC
+            cmd+=[0x20]
+            #设定命令的次要函数SFC
+            cmd+=[0x0b]#读取保持寄存器内容
+            #分别设定4位发送目标CPU编号与发送源编号
+            cmd+=[0x10]
+            #预留SPARE
+            cmd+=[0x00]
+            #设定要写入的保持寄存器开头地址
+            # n2=[int(ii.encode('hex'),16) for ii in list(('%%0%dx'%(2 << 1)%REG_COL_INDEX[0]).decode('hex')[-2:])]
+            s2=[]
+            [s2.append(REG_COL_INDEX2[0]>>(i*8)&0xff) for i in range(2)]
+            # n2.reverse()
+            cmd+=s2
+            #设定要写入的保持寄存器数量
+            # n3=[int(ii.encode('hex'),16) for ii in list(('%%0%dx'%(2 << 1)%REG_COL_INDEX[1]).decode('hex')[-2:])]
+            s3=[]
+            [s3.append(REG_COL_INDEX2[1]>>(i*8)&0xff) for i in range(2)]
+            # n3.reverse()
+            cmd+=s3
+        #设定要写入的保持寄存器内容
+        cmd+=REG_D_START
+        # cmd+=[int(ii.encode('hex'),16) for ii in list(('%%0%dx'%(4 << 1)%speed).decode('hex')[-4:])]
+        self.sendcmd(cmd,_id)
+        rc=self.recvcmd()
+        #解析响应数据，判断是否完成
+
+        return rc
+
+    def initStage(self,_id=1):
+        '''
+            初始化电机(清除报警)
+        '''
+        # self.__pos=pos
+        cmd=copy.copy(sendcomd_read)
+        if _id == 1:
+            #设定命令的Length（固定8）
+            cmd+=[0x08]
+            #设定命令的主要函数MFC
+            cmd+=[0x20]
+            #设定命令的次要函数SFC
+            cmd+=[0x09]#读取保持寄存器内容
+            #分别设定4位发送目标CPU编号与发送源编号
+            cmd+=[0x10]
+            #预留SPARE
+            cmd+=[0x00]
+            #设定要读取的保持寄存器的开头地址
+            # n=[int(ii.encode('hex'),16) for ii in list(('%%0%dx'%(2 << 1)%REG_GSTATUS_INDEX[0]).decode('hex')[-2:])]
+            s=[]
+            [s.append(REG_GSTATUS_INDEX[0]>>(i*8)&0xff) for i in range(2)]
+            # n1=n.reverse()
+            cmd+=s
+            #设定要读取的保持寄存器数量
+            # cmd+=[int(ii.encode('hex'),16) for ii in list(('%%0%dx'%(2 << 1)%REG_GSTATUS_INDEX[1]).decode('hex')[-2:])]
+            s1=[]
+            [s1.append(REG_GSTATUS_INDEX[1]>>(i*8)&0xff) for i in range(2)]
+            # n2=n.reverse()
+            cmd+=s1
+            #发送命令
+            # print(cmd)
+            self.sendcmd(cmd,_id)
+            recv=self.recvcmd()
+            # if recv==1:
+                # return 999.0
+            # result = ct.c_int32(int((recv[-1]+recv[-2]+recv[-3]+recv[-4]).encode('hex'),16)).value
+        else:
+            #设定命令的Length（固定8）
+            cmd+=[0x08]
+            #设定命令的主要函数MFC
+            cmd+=[0x20]
+            #设定命令的次要函数SFC
+            cmd+=[0x09]#读取保持寄存器内容
+            #分别设定4位发送目标CPU编号与发送源编号
+            cmd+=[0x10]
+            #预留SPARE
+            cmd+=[0x00]
+            #设定要读取的保持寄存器的开头地址
+            # n=[int(ii.encode('hex'),16) for ii in list(('%%0%dx'%(2 << 1)%REG_GSTATUS_INDEX2[0]).decode('hex')[-2:])]
+            s=[]
+            [s.append(REG_GSTATUS_INDEX2[0]>>(i*8)&0xff) for i in range(2)]
+            # n1=n.reverse()
+            cmd+=s
+            #设定要读取的保持寄存器数量
+            # cmd+=[int(ii.encode('hex'),16) for ii in list(('%%0%dx'%(2 << 1)%REG_GSTATUS_INDEX2[1]).decode('hex')[-2:])]
+            s1=[]
+            [s1.append(REG_GSTATUS_INDEX2[1]>>(i*8)&0xff) for i in range(2)]
+            # n2=n.reverse()
+            cmd+=s1
+            #发送命令
+            # print(cmd)
+            self.sendcmd(cmd,_id)
+            recv=self.recvcmd()
+            # if recv==1:
+                # return 999.0
+            # result = ct.c_int32(int((recv[-1]+recv[-2]+recv[-3]+recv[-4]).encode('hex'),16)).value
+        return recv
+
+    def getPositionAndPulse(self):
+        '''
+            获得角度
+            返回整型
+        '''
+        # self.__pos=pos
+        cmd=copy.copy(sendcomd_read)
+        #设定命令的Length（固定8）
+        cmd+=[0x08,0x00]
+        #设定命令的主要函数MFC
+        cmd+=[0x20]
+        #设定命令的次要函数SFC
+        cmd+=[0x09]#读取保持寄存器内容
+        #分别设定4位发送目标CPU编号与发送源编号
+        cmd+=[0x10]
+        #预留SPARE
+        cmd+=[0x00]
+        #设定要读取的保持寄存器的开头地址
+        # n2=[int(ii.encode('hex'),16) for ii in list(('%%0%dx'%(2 << 1)%REG_GET_TANG_AND_PULSE_INDEX[0]).decode('hex')[-2:])]
+        s=[]
+        [s.append(REG_GET_TANG_AND_PULSE_INDEX[0]>>(i*8)&0xff) for i in range(2)]
+        # n2.reverse()
+        cmd+=s
+        #设定要读取的保持寄存器数量
+        # n3=[int(ii.encode('hex'),16) for ii in list(('%%0%dx'%(2 << 1)%REG_GET_TANG_AND_PULSE_INDEX[1]).decode('hex')[-2:])]
+        s1=[]
+        [s1.append(REG_GET_TANG_AND_PULSE_INDEX[1]>>(i*8)&0xff) for i in range(2)]
+        # n3.reverse()
+        cmd+=s1
+        #发送命令
+        # print(cmd)
+        self.sendcmd(cmd)
+        recv=self.recvcmd()
+        if recv==1:
+            return 0,0,0
+        ttl = ct.c_int32(int.from_bytes(recv[-4:],'little')).value
+        pulse = ct.c_int32(int.from_bytes(recv[-8:-4],'little')).value
+        pos = ct.c_int32(int.from_bytes(recv[-12:-8],'little')).value
+        # ttl = ct.c_int32(int((recv[-1]+recv[-2]+recv[-3]+recv[-4]).encode('hex'),16)).value
+        # pulse = ct.c_int32(int((recv[-5]+recv[-6]+recv[-7]+recv[-8]).encode('hex'),16)).value
+        # pos = ct.c_int32(int((recv[-9]+recv[-10]+recv[-11]+recv[-12]).encode('hex'),16)).value
+        return pos,pulse,ttl
+    
+
+
+if __name__ == '__main__':
+
+    scb=stageControl_basic()
+    scb.setConnect(1)
+    scb.stop(1)
+    angle = 5000
+    scb.setSpeed(5,1)
+    scb.setPosition(angle,1)
+    scb.setMotionStart(1)
+    pos=scb.getPosition(1)
+    while(abs(angle-pos)>0.1):
+        pos=scb.getPosition(1)
+        time.sleep(1)
+        # print('pos:%s'%pos)
+    # re=scb.setPosition(2,100)
+    # re=scb.stop(1)
+    # print('re:%s'%re)
+
+    # time.sleep(5)
+    # scb.stop(1)
+    pass

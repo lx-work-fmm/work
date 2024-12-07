@@ -1,0 +1,247 @@
+from ctypes import *
+from ctypes.wintypes import HANDLE
+
+# types
+# (1) alarm
+class ESAlarmData(Structure):
+    _pack_ = 1
+    _fields_ = [
+        ('alarmCode', c_long),
+        ('alarmData', c_long),
+        ('alarmType', c_long),
+        ('alarmTime', c_char * (16 + 1)),
+        ('alarmName', c_char * (32 + 1)),
+    ]
+class ESAlESAlarmList(Structure):
+    _pack_ = 1
+    _fields_ = [
+        ('data', ESAlarmData * 4)
+    ]
+# (2) get pos
+class ESAxisData(Structure):
+    _pack_ = 1
+    _fields_ = [
+        # x(mm), y(mm), z(mm), Rx(deg), Ry(deg), Rz(deg), Re(deg), ?
+        ('axis', c_double * 8)
+    ]
+class ESPositionData(Structure):
+    _pack_ = 1
+    _fields_ = [
+        # 0 -> pulse, 16 -> coordinate
+        ('dataType', c_long),
+        ('fig', c_long),
+        ('toolNo', c_long),
+        ('userFrameNo', c_long),
+        ('exFig', c_long),
+        ('axesData', ESAxisData),
+    ]
+# (3) pos move(pulse/cart)
+class ESMoveData(Structure):
+    _pack_ = 1
+    _fields_ = [
+        # 0, 1-8
+        ('roboNo', c_long),
+        # 0, 1-8
+        ('stationNo', c_long),
+        # 0 -> %, 1 -> V, 2 -> VR
+        ('speedType', c_long),
+        # 单位为 %, 或 mm/s, 或 °/s
+        ('speed', c_double),
+    ]
+
+class ESBaseData(Structure):
+    _pack_ = 1
+    _fields_ = [
+        ('axis', c_double * 3)
+    ]
+class ESStationData(Structure):
+    _pack_ = 1
+    _fields_ = [
+        ('axis', c_double * 6)
+    ]
+# robot 脉冲位置数据
+class ESPulsePosData(Structure):
+    _pack_ = 1
+    _fields_ = [
+        ('axis', c_double * 8)
+    ]
+class ESPulseMoveData(Structure):
+    _pack_ = 1
+    _fields_ = [
+        ('moveData', ESMoveData),
+        # ('robotData', ESPulsePosData),
+        ('robotPos', ESPulsePosData),
+        # ('baseData', ESBaseData),
+        ('basePos', ESBaseData),
+        # ('stationData', ESStationData),
+        ('stationPos', ESStationData),
+        ('toolNo', c_long),
+    ]
+# robot cart位置数据
+class ESCartPosData(Structure):
+    _pack_ = 1
+    _fields_ = [
+        # 16 -> base coordinate, 17 -> robot coordinate, 18 -> user coordinate, 19 -> tool coordinate, 
+        ('dataType', c_long),
+        ('fig', c_long),
+        ('toolNo', c_long),
+        ('userFrameNo', c_long),
+        ('exFig', c_long),
+        ('axesData', ESAxisData),
+    ]
+class ESCartMoveData(Structure):
+    _pack_ = 1
+    _fields_ = [
+        ('moveData', ESMoveData),
+        ('robotPos', ESCartPosData),
+        ('basePos', ESBaseData),
+        ('stationPos', ESStationData),
+    ]
+
+
+class GP25Base:
+    def __init__(self, dll_path: str = './MOTOCOMES.dll'):
+        self.dll_path = dll_path
+        
+        self.h = WinDLL(self.dll_path)
+        self.han = HANDLE()
+        
+        self.pmd = ESPulseMoveData()
+    
+    def getHan(self):     
+        return self.han.value
+    
+    # (0) 打开/关闭
+    
+    def ESOpen(self, controllerType: int = 4, ipAddress: str = '192.168.255.1'):
+        """
+        :controllerType: 机器人控制柜型号, 参见 https://www.yaskawa.com.cn/product/device_detail.aspx?classid=432908514180988928
+            1 -> DX100
+            2 -> FS100
+            3 -> DX200
+            4 -> YRC1000
+            5 -> YRC1000micro
+        :ipAddress: 机器人 ip 地址
+        :RETURN:
+            0 -> 正常连接 （ip可以不存在？）
+            0x0069(105) -> 硬件锁未找到
+            0x006A(106) -> 硬件锁找到，但不是 MOTOCOM32 的
+            0x9000(36864) -> 连接错误
+            0x9100(37120) -> 参数错误
+            else -> ... 
+        """
+        return self.h.ESOpen(c_long(controllerType), c_char_p(ipAddress.encode('utf-8')), byref(self.han))
+    
+    def ESClose(self):
+        """
+        :RETURN: 0 -> 正常
+        """
+        return self.h.ESClose(self.getHan())
+    
+    # (1) robot control
+    def ESReset(self):
+        """
+        reset alarm
+        """ 
+        return self.h.ESReset(self.getHan())
+    
+    def ESGetAlarm(self):
+        """
+        reset alarm
+        """
+        al = ESAlESAlarmList()
+        ret = self.h.ESGetAlarm(self.getHan(), byref(al))
+        return ret, al
+
+    def ESHold(self, onOff: int = 1):
+        """
+        :onOff: 1 -> on, 2 -> off
+        """
+        return self.h.ESHold(self.getHan(), c_long(onOff))
+    
+    def ESServo(self, onOff: int = 1):
+        """
+        :onOff: 1 -> on, 2 -> off
+        """
+        return self.h.ESServo(self.getHan(), c_long(onOff))
+    
+    def ESGetPosition(self, ctrlGrp: int = 101):
+        """
+        读取特定控制组的当前的机器人位置
+        
+        :ctrlGrp:
+            1 -> robot pulse
+            101 -> robot coordinate
+        
+        :RETURN: (flag, posData)
+            flag: 0 为成功
+            posData: {
+                // 0 -> pulse, 16 -> coordinate
+                dataType: int,
+                fig: int,
+                toolNo: int,
+                userFrameNo: int,
+                exFig: int,
+                axesData: { axis: float[8] },
+            }
+        """
+        pd = ESPositionData()
+        return self.h.ESGetPosition(self.getHan(), ctrlGrp, byref(pd)), pd
+
+    def ESPulseMove(self, target: list = [0.0, 0.0, 0.0, 0.0, 0.0, 0.0], moveType: int = 1,
+            robotNo = 1, stationNo = 0, speedType = 0, speed = 3.0, toolNo = 0):
+        """
+        通过脉冲来移动机器人
+        :target: 机器人的目标坐标 (pulse)
+        :moveType: 1 -> MOVJ (link), 2 -> MOVL (straight)
+        :robotNo: 默认 1
+        :stationNo: 默认 0
+        :speedType: 0 -> %, 1 -> V, 2 -> VR
+        :speed: 单位为 %, 或 mm/s, 或 °/s
+        :toolNo: 默认 0
+        
+        :return:
+            0 -> success
+            0xb008(45064) -> 控制组设置错误
+        """
+        
+        print(target, moveType, robotNo, stationNo, speedType, speed, toolNo)
+        self.pmd.robotPos.dataType = c_long(16)
+        self.pmd.robotPos.toolNo = c_long(toolNo)
+        self.pmd.robotPos.fig = c_long(0x00000100)
+        self.pmd.robotPos.userFrameNo = c_long(0)
+        self.pmd.robotPos.exFig = c_long(0)
+        
+        self.pmd.basePos.axis[:3] = [0.0, 0.0, 0.0]
+        self.pmd.stationPos.axis[:6] = [0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
+        
+        self.pmd.moveData.robotNo = c_long(robotNo)
+        self.pmd.moveData.stationNo = c_long(stationNo)
+        self.pmd.moveData.speedType = c_long(speedType)
+        self.pmd.moveData.speed = c_double(speed)
+        
+        self.pmd.robotPos.axis[:6] = target
+        
+        #
+        # pmd.toolNo = c_long(toolNo)
+        
+        return self.h.ESPulseMove(self.getHan(), c_long(moveType), self.pmd)
+
+    def ESCartMove(self):
+        """
+        没必要用
+        """
+        pass
+
+
+    
+if __name__ == '__main__':
+    import os
+    os.chdir(os.path.dirname(__file__))
+    rb = GP25Base()
+    # print(rb.ESOpen())
+    print(rb.ESOpen(controllerType=4))
+    
+    # ret = rb.ESGetPosition()[1] 
+    # print(ret.dataType,ret.fig, ret.toolNo, ret.userFrameNo, ret.exFig, [v for v in ret.axesData.axis])
+    # print(struct2dict(ret))

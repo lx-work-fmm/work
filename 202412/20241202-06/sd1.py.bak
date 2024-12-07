@@ -1,0 +1,12 @@
+import os
+os.chdir(os.path.dirname(__file__))
+from sd import Demo
+
+
+if __name__ == '__main__':
+    pass
+    # a = 123
+    # print(b'\x11\x00\x00\x00\x00\x00\x16\x00\x00\x00\x00\x00\x08\x00\x20\x09\x10\x00\x00\x00\x0a\x00'.decode())
+    # print(Demo().request('3'))
+    import struct
+    print(b'1'+1)

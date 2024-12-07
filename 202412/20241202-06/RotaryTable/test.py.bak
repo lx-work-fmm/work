@@ -1,0 +1,13 @@
+import stageControl_common
+
+scc = stageControl_common.stageControl_common()
+print(scc.setConnect())
+scc.setExtTrig(0)
+print(scc.setPosition(90, 40))
+scc.setMotionStart()
+import time
+time.sleep(9)
+print(scc.getPosition())
+
+
+ 

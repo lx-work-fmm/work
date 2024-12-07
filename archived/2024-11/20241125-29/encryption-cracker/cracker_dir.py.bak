@@ -1,0 +1,149 @@
+import os
+import wx
+import wx.media
+
+class PathSelector(wx.Window):
+    def __init__(self, parent: wx.Window, file_or_dir = 0, label = None, value = ''):
+        """
+        file_or_dir
+            0 -> file
+            1 -> dir
+        """
+        super().__init__(parent)
+        self.file_or_dir = file_or_dir
+        self.bs = wx.BoxSizer(wx.HORIZONTAL)
+        
+        self.btn_select = wx.Button(self)
+        self.tc = wx.TextCtrl(self, size=(240,-1), style=wx.TE_RICH2, value=value)
+        self.tc_err = wx.TextCtrl(self, size=(22,-1), value='*', style=wx.TE_RICH2|wx.TE_READONLY|wx.TE_CENTER)
+        self.tc_err.SetStyle(0,1,wx.TextAttr('red','white'))
+        
+        self.bs.Add(self.btn_select, flag=wx.RIGHT, border=10)
+        self.bs.Add(self.tc)
+        self.bs.Add(self.tc_err)
+        self.SetSizer(self.bs)
+        
+        if file_or_dir == 0:
+            self.dlg = wx.FileDialog(self, 'select a file')
+            self.btn_select.SetLabel(label or '选择文件')
+        elif file_or_dir == 1:
+            self.dlg = wx.DirDialog(self, 'select a directory')
+            self.btn_select.SetLabel(label or '选择目录')
+        else:
+            raise Exception(f'file_or_dir = 0 | 1, not {file_or_dir}')
+        # self.flag_error_path = True
+        self.on_tc_change(None)
+        
+        self.BindEvents()
+        
+    def BindEvents(self):
+        self.Bind(wx.EVT_BUTTON, self.on_btn_click, self.btn_select)
+        self.Bind(wx.EVT_TEXT, self.on_tc_change, self.tc, )
+    
+    def on_btn_click(self, e):
+        if e:
+            e.Skip()
+        if self.dlg.ShowModal() == wx.ID_OK:
+            self.tc.SetValue(self.dlg.GetPath())
+            # self.tc.SetToolTip(self.dlg.GetPath())
+    
+    def on_tc_change(self, e):
+        if e:
+            e.Skip()
+        # print(self.tc.MinWidth, self.tc.CharWidth*len(self.tc.Value))
+        if self.tc.MinWidth < self.tc.CharWidth*len(self.tc.Value):
+            self.tc.SetToolTip(self.tc.Value)
+        else:
+            self.tc.UnsetToolTip()
+        
+        import os
+        if self.file_or_dir == 0 and os.path.isfile(self.tc.Value) or \
+            self.file_or_dir == 1 and os.path.isdir(self.tc.Value):
+            self.tc_err.SetStyle(0,1,wx.TextAttr('green','white'))
+            self.flag_error_path = False
+        elif self.file_or_dir == 0 and os.path.isdir(os.path.dirname(self.tc.Value)):
+            self.tc_err.SetStyle(0,1,wx.TextAttr('yellow','white'))
+            self.flag_error_path = False
+        elif self.file_or_dir == 0 and not os.path.isfile(self.tc.Value) or \
+            self.file_or_dir == 1 and not os.path.isdir(self.tc.Value):
+            self.tc_err.SetStyle(0,1,wx.TextAttr('red','white'))
+            self.flag_error_path = True
+
+    def getValue(self):
+        return self.tc.Value
+
+class Cracker(wx.Frame):
+    def __init__(self, *args, **kw):
+        super().__init__(None, title='encryption cracker', *args, **kw)
+        # (1) view
+        pnl = wx.Panel(self)
+        gbs = wx.GridBagSizer(10, 10)
+        
+        self.ps_source = PathSelector(pnl, 1)
+        self.ps_dest = PathSelector(pnl, 1)
+        self.c_type = wx.Choice(pnl, choices=['.py->.pyy', '.pyp->.py', '.py->.pyy | *.*', '.pyp->.py | *.*', '*.*->.*-bak', '*.*-bak->*.*'])
+        self.btn_start = wx.Button(pnl, label='crack')
+        
+        gbs.Add((10,10), (0,0))
+        gbs.Add(self.ps_source, (1,1), span=(1,2))
+        gbs.Add(self.ps_dest, (2,1), span=(1,2))
+        gbs.Add(self.c_type, (3,1), span=(1,1))
+        gbs.Add(self.btn_start, (3,2), span=(1,1), flag=wx.LEFT, border=80)
+        gbs.Add((10,10), (4,3))
+        pnl.SetSizer(gbs)
+        
+        gbs.Fit(self)
+        self.Center()
+        
+        self.c_type.Select(0)
+        
+        # (2) control
+        self.Bind(wx.EVT_BUTTON, self.on_crack, self.btn_start)
+    
+    def on_crack(self, e):
+        try:
+            import shutil, os
+            src = os.path.abspath(self.ps_source.getValue())
+            dest = self.ps_dest.getValue()
+            assert not os.path.exists(dest) or len(os.listdir(dest))==0, 'dest 必须是空的目录'
+            for dir, sub_dirs, sub_files in os.walk(src):
+                # print(dir, sub_dirs, sub_files)
+                dest_dir = os.path.join(dest, dir[len(src)+1:])
+                if not os.path.exists(dest_dir):
+                    os.mkdir(dest_dir)
+                for f in sub_files:
+                    src_f = os.path.join(dir, f)
+                    dest_f = os.path.join(dest_dir, f)
+                    
+                    suf = os.path.splitext(dest_f)[1]
+                    op = self.c_type.GetSelection()
+                    
+                    try:
+                        if op in [0, 2] and suf == '.py':
+                            shutil.copy(src_f, os.path.splitext(dest_f)[0] + '.pyy')
+                        elif op in [1, 3] and suf == '.pyy':
+                            shutil.copy(src_f, os.path.splitext(dest_f)[0] + '.py')
+                        elif op in [2, 3]:
+                            shutil.copy(src_f, dest_f)
+                        t = os.path.splitext(src_f)[1]
+                        if src_f.count('projects') > 0:
+                            print(t)
+                            
+                        if op == 4:
+                            shutil.copy(src_f, os.path.splitext(dest_f)[0] + f'{t}.bak')
+                        elif op == 5:
+                            if t.endswith('.bak'):
+                                shutil.copy(src_f, os.path.splitext(dest_f)[0] + t[:-4])
+                            else:
+                                shutil.copy(src_f, dest_f)
+                    except:
+                        wx.MessageBox(src_f)
+            wx.MessageBox('success')
+        except:
+            wx.MessageBox('error')
+        
+
+if __name__ == '__main__':
+    app = wx.App()
+    Cracker().Show()
+    app.MainLoop()

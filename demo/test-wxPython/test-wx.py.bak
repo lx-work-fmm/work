@@ -1,0 +1,34 @@
+import wx
+
+
+if __name__ == '__main__':
+    app = wx.App()
+    frame = wx.Frame(None)
+    panel = wx.Panel(frame)
+
+    dir_dialog = wx.DirDialog(frame, 'initial msg')
+    def get_path():
+        dir_dialog.SetMessage('选择目录')
+        return dir_dialog.GetPath() if dir_dialog.ShowModal() == wx.ID_OK else 'None'
+    file_dialog = wx.FileDialog(frame, 'initial msg')
+    def get_file():
+        file_dialog.SetMessage('选择文件')
+        return file_dialog.GetPath() if file_dialog.ShowModal() == wx.ID_OK else 'None'
+
+
+    btn1 = wx.Button(panel, label='增益表: ', pos=(0,20))
+    txt1 = wx.StaticText(panel, label='', pos=(100,20))
+    btn1.Bind(wx.EVT_BUTTON, lambda e: txt1.SetLabel(get_file()))
+
+    btn2 = wx.Button(panel, label='效率表: ', pos=(0,70))
+    txt2 = wx.StaticText(panel, label='', pos=(100,70))
+    btn2.Bind(wx.EVT_BUTTON, lambda e: txt2.SetLabel(get_file()))
+
+    btn3 = wx.Button(panel, label='输出目录: ', pos=(0,120))
+    txt3 = wx.StaticText(panel, label='', pos=(100,120))
+    btn3.Bind(wx.EVT_BUTTON, lambda e: txt3.SetLabel(get_path()))
+
+
+    frame.Show()
+    app.MainLoop()
+

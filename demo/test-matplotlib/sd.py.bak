@@ -1,0 +1,17 @@
+import matplotlib.pyplot as plt
+import numpy as np
+
+fig, axs = plt.subplots(1, 2, figsize=(12,6))
+
+x = np.array(range(10))
+axs[0].plot(x, np.sin(x), label='sin(x)')
+axs[0].plot(x, np.cos(x), label='cos(x)')
+axs[0].legend()
+axs[0].set_title('trigonometric function')
+
+axs[1].plot(x, np.exp(x), label='e^x')
+axs[1].plot(x, x ** x, label='x^x')
+axs[1].legend()
+axs[1].set_title('transcendental function')
+
+plt.show()
