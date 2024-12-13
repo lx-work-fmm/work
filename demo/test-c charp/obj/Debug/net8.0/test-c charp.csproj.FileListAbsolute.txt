@@ -1,0 +1,5 @@
+E:\work\demo\test-c charp\obj\Debug\net8.0\test-c charp.GeneratedMSBuildEditorConfig.editorconfig
+E:\work\demo\test-c charp\obj\Debug\net8.0\test-c charp.AssemblyInfoInputs.cache
+E:\work\demo\test-c charp\obj\Debug\net8.0\test-c charp.AssemblyInfo.cs
+E:\work\demo\test-c charp\obj\Debug\net8.0\test-c charp.csproj.CoreCompileInputs.cache
+E:\work\demo\test-c charp\obj\Debug\net8.0\test-c charp.sourcelink.json
