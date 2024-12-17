@@ -1,0 +1,163 @@
+<!DOCTYPE html>
+<html class="writer-html5" lang="zh-CN">
+<head>
+  <meta charset="utf-8" /><meta name="generator" content="Docutils 0.19: https://docutils.sourceforge.io/" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>src &mdash; ttest 1.0 文档</title>
+      <link rel="stylesheet" type="text/css" href="_static/pygments.css" />
+      <link rel="stylesheet" type="text/css" href="_static/css/theme.css" />
+
+  
+  <!--[if lt IE 9]>
+    <script src="_static/js/html5shiv.min.js"></script>
+  <![endif]-->
+  
+        <script data-url_root="./" id="documentation_options" src="_static/documentation_options.js"></script>
+        <script src="_static/jquery.js"></script>
+        <script src="_static/underscore.js"></script>
+        <script src="_static/_sphinx_javascript_frameworks_compat.js"></script>
+        <script src="_static/doctools.js"></script>
+        <script src="_static/sphinx_highlight.js"></script>
+        <script src="_static/translations.js"></script>
+    <script src="_static/js/theme.js"></script>
+    <link rel="index" title="索引" href="genindex.html" />
+    <link rel="search" title="搜索" href="search.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="index.html" class="icon icon-home">
+            ttest
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="search.html" method="get">
+    <input type="text" name="q" placeholder="搜索文档" aria-label="搜索文档" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="导航菜单">
+              <!-- Local TOC -->
+              <div class="local-toc"><ul>
+<li><a class="reference internal" href="#">src</a></li>
+</ul>
+</div>
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="移动版导航菜单" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="index.html">ttest</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="页面导航">
+  <ul class="wy-breadcrumbs">
+      <li><a href="index.html" class="icon icon-home" aria-label="Home"></a></li>
+      <li class="breadcrumb-item active">src</li>
+      <li class="wy-breadcrumbs-aside">
+            <a href="_sources/modules.rst.txt" rel="nofollow"> 查看页面源码</a>
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="src">
+<h1>src<a class="headerlink" href="#src" title="此标题的永久链接"></a></h1>
+<div class="toctree-wrapper compound">
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="RFTester.html">RFTester module</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="RFTester.html#RFTester.Instrument"><code class="docutils literal notranslate"><span class="pre">Instrument</span></code></a><ul>
+<li class="toctree-l3"><a class="reference internal" href="RFTester.html#RFTester.Instrument.__init__"><code class="docutils literal notranslate"><span class="pre">Instrument.__init__()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="RFTester.html#RFTester.Instrument.connect"><code class="docutils literal notranslate"><span class="pre">Instrument.connect()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="RFTester.html#RFTester.Instrument.is_connected"><code class="docutils literal notranslate"><span class="pre">Instrument.is_connected()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="RFTester.html#RFTester.Instrument.test_connection_or_reconnect"><code class="docutils literal notranslate"><span class="pre">Instrument.test_connection_or_reconnect()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="RFTester.html#RFTester.Instrument.write"><code class="docutils literal notranslate"><span class="pre">Instrument.write()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="RFTester.html#RFTester.Instrument.query"><code class="docutils literal notranslate"><span class="pre">Instrument.query()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="RFTester.html#RFTester.Source"><code class="docutils literal notranslate"><span class="pre">Source</span></code></a><ul>
+<li class="toctree-l3"><a class="reference internal" href="RFTester.html#RFTester.Source.__init__"><code class="docutils literal notranslate"><span class="pre">Source.__init__()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="RFTester.html#RFTester.Source.test"><code class="docutils literal notranslate"><span class="pre">Source.test()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="RFTester.html#RFTester.Spectrum"><code class="docutils literal notranslate"><span class="pre">Spectrum</span></code></a><ul>
+<li class="toctree-l3"><a class="reference internal" href="RFTester.html#RFTester.Spectrum.__init__"><code class="docutils literal notranslate"><span class="pre">Spectrum.__init__()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="RFTester.html#RFTester.Spectrum.set_freq"><code class="docutils literal notranslate"><span class="pre">Spectrum.set_freq()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="RFTester.html#RFTester.Spectrum.read"><code class="docutils literal notranslate"><span class="pre">Spectrum.read()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="RFTester.html#RFTester.Spectrum.test"><code class="docutils literal notranslate"><span class="pre">Spectrum.test()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="RFTester.html#RFTester.InputText"><code class="docutils literal notranslate"><span class="pre">InputText</span></code></a><ul>
+<li class="toctree-l3"><a class="reference internal" href="RFTester.html#RFTester.InputText.__init__"><code class="docutils literal notranslate"><span class="pre">InputText.__init__()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="RFTester.html#RFTester.InputText.getValue"><code class="docutils literal notranslate"><span class="pre">InputText.getValue()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="RFTester.html#RFTester.PathSelector"><code class="docutils literal notranslate"><span class="pre">PathSelector</span></code></a><ul>
+<li class="toctree-l3"><a class="reference internal" href="RFTester.html#RFTester.PathSelector.__init__"><code class="docutils literal notranslate"><span class="pre">PathSelector.__init__()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="RFTester.html#RFTester.PathSelector.BindEvents"><code class="docutils literal notranslate"><span class="pre">PathSelector.BindEvents()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="RFTester.html#RFTester.PathSelector.on_btn_click"><code class="docutils literal notranslate"><span class="pre">PathSelector.on_btn_click()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="RFTester.html#RFTester.PathSelector.on_tc_change"><code class="docutils literal notranslate"><span class="pre">PathSelector.on_tc_change()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="RFTester.html#RFTester.PathSelector.getValue"><code class="docutils literal notranslate"><span class="pre">PathSelector.getValue()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="RFTester.html#RFTester.MainFrame"><code class="docutils literal notranslate"><span class="pre">MainFrame</span></code></a><ul>
+<li class="toctree-l3"><a class="reference internal" href="RFTester.html#RFTester.MainFrame.__init__"><code class="docutils literal notranslate"><span class="pre">MainFrame.__init__()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="RFTester.html#RFTester.MainFrame.testing"><code class="docutils literal notranslate"><span class="pre">MainFrame.testing()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="RFTester.html#RFTester.Main"><code class="docutils literal notranslate"><span class="pre">Main</span></code></a><ul>
+<li class="toctree-l3"><a class="reference internal" href="RFTester.html#RFTester.Main.__init__"><code class="docutils literal notranslate"><span class="pre">Main.__init__()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="RFTester.html#RFTester.Main.Bind_Events"><code class="docutils literal notranslate"><span class="pre">Main.Bind_Events()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="RFTester.html#RFTester.Main.on_start_or_stop"><code class="docutils literal notranslate"><span class="pre">Main.on_start_or_stop()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="RFTester.html#RFTester.Main.test"><code class="docutils literal notranslate"><span class="pre">Main.test()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="RFTester.html#RFTester.Main.test_core"><code class="docutils literal notranslate"><span class="pre">Main.test_core()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="RFTester.html#RFTester.Main.debug"><code class="docutils literal notranslate"><span class="pre">Main.debug()</span></code></a></li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</div>
+</section>
+
+
+           </div>
+          </div>
+          <footer>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; 版权所有 2024, lx.</p>
+  </div>
+
+  利用 <a href="https://www.sphinx-doc.org/">Sphinx</a> 构建，使用的 
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">主题</a>
+    由 <a href="https://readthedocs.org">Read the Docs</a> 开发.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>
